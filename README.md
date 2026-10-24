@@ -117,6 +117,11 @@ lists the objects under it, the topmost first, each with its path and the object
 filters, tells which object a click there would reach. Windows only. They work as a real mouse does: the game
 reads them through its own input, without the focus, and also while the Windows session is locked, when
 no real mouse reaches it. The cursor of Windows moves with them, since the game reads its position from it.
+Once the game's window has lost the focus, Unity's event system ignores the pointer (`EventSystem.isFocused`):
+both tools tell it the window has the focus again, as a click on it would, and it stays so until the window
+loses the focus once more. `mouse_click` also lifts, for the click only, the lock the game puts on every
+control while its window is out of focus (`flightDriver_ApplicationFocus`), as `press_part_button` does: the
+EVA construction tools, among others, ignore a click while it holds.
 
 Other mods can add their own tools, without depending on this one: see
 [Adding tools from another mod](#adding-tools-from-another-mod).

@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using UnityEngine;
@@ -41,6 +42,13 @@ namespace com.github.lhervier.ksp.util.mcpserver
             { "left", new Button(0, WM_LBUTTONDOWN, WM_LBUTTONUP, MK_LBUTTON) },
             { "right", new Button(1, WM_RBUTTONDOWN, WM_RBUTTONUP, MK_RBUTTON) }
         };
+
+        /// <summary>The input lock FlightDriver sets while the window of KSP does not have the focus.</summary>
+        private const string FocusLock = "flightDriver_ApplicationFocus";
+
+        /// <summary>The field behind EventSystem.isFocused, which has no setter.</summary>
+        private static readonly FieldInfo HasFocus =
+            typeof(EventSystem).GetField("m_HasFocus", BindingFlags.Instance | BindingFlags.NonPublic);
 
         public static IEnumerable<Tool> All()
         {
@@ -107,6 +115,35 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 call.Fail("count: 1 for a click, 2 for a double click");
                 yield break;
             }
+            // The lock the game sets on every control whenever its window loses the focus is lifted for the click,
+            // as press_part_button does: the player's click would have given the focus back. While it holds, the
+            // EVA construction tools, among others, refuse to change.
+            bool focusLocked = InputLockManager.lockStack.ContainsKey(FocusLock);
+            if (focusLocked)
+            {
+                InputLockManager.RemoveControlLock(FocusLock);
+            }
+            try
+            {
+                yield return Press(call, target, button, count);
+            }
+            finally
+            {
+                if (focusLocked)
+                {
+                    InputLockManager.SetControlLock(FocusLock);
+                }
+            }
+            if (call.IsError)
+            {
+                yield break;
+            }
+            call.Text(Report(target, call.String("button", "left").ToLowerInvariant()));
+        }
+
+        /// <summary>Presses and releases the button count times at the target, each time once the game has seen it.</summary>
+        private static IEnumerator Press(ToolCall call, Target target, Button button, int count)
+        {
             for (int i = 0; i < count; i++)
             {
                 // The button goes down, then up once the game has seen it down for a frame: a press as short as a
@@ -130,7 +167,6 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 // follows at once, well within the time the game allows between the two.
                 yield return null;
             }
-            call.Text(Report(target, call.String("button", "left").ToLowerInvariant()));
         }
 
         /// <summary>
@@ -178,6 +214,7 @@ namespace com.github.lhervier.ksp.util.mcpserver
             // message, which Windows no longer sends once the session is locked, nor to a window the cursor is not
             // over: the cursor is put there, then the move posted. A click posted without it lands where the
             // pointer was.
+            FocusEventSystem();
             ScreenPoint point = new ScreenPoint { X = target.X, Y = target.Y };
             ClientToScreen(target.Window, ref point);
             SetCursorPos(point.X, point.Y);
@@ -194,6 +231,23 @@ namespace com.github.lhervier.ksp.util.mcpserver
             // The event system updates the objects under the pointer in the frame the game reads it; one more
             // frame leaves room for the order of the scripts.
             yield return null;
+        }
+
+        /// <summary>
+        /// Makes the event system take the pointer as it does in a window with the focus. Once the game's window
+        /// has lost the focus (the player clicked another window), the event system says so, and the input module
+        /// then ignores the pointer: no hover, no click on the interface. It stays so until the game's window gets
+        /// the focus back, or the game loses it again.
+        /// </summary>
+        private static void FocusEventSystem()
+        {
+            EventSystem events = EventSystem.current;
+            if (events == null || events.isFocused || HasFocus == null)
+            {
+                return;
+            }
+            // EventSystem.OnApplicationFocus is the only writer of isFocused.
+            HasFocus.SetValue(events, true);
         }
 
         /// <summary>
