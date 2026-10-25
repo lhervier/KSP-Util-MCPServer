@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
+using EditorGizmos;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -50,6 +51,33 @@ namespace com.github.lhervier.ksp.util.mcpserver
             { ConstructionMode.Rotate, typeof(EVAConstructionToolsUI).GetField("rotateButton", BindingFlags.Instance | BindingFlags.NonPublic) }
         };
 
+        /// <summary>The axes of a gizmo, in its own frame.</summary>
+        private static readonly Dictionary<string, Vector3> GizmoAxes = new Dictionary<string, Vector3>
+        {
+            { "x", Vector3.right },
+            { "y", Vector3.up },
+            { "z", Vector3.forward }
+        };
+
+        /// <summary>Over how many frames a gizmo is dragged when the call does not say.</summary>
+        private const int DefaultGizmoSteps = 20;
+
+        private const BindingFlags Private = BindingFlags.Instance | BindingFlags.NonPublic;
+
+        // The gizmos of EVAConstructionModeEditor, their handles, and the callbacks the handles call when the mouse
+        // grabs, drags and releases them, all internal to the game.
+        private static readonly FieldInfo EditorGizmoOffset = typeof(EVAConstructionModeEditor).GetField("gizmoOffset", Private);
+        private static readonly FieldInfo EditorGizmoRotate = typeof(EVAConstructionModeEditor).GetField("gizmoRotate", Private);
+        private static readonly FieldInfo OffsetHandles = typeof(GizmoOffset).GetField("handles", Private);
+        private static readonly FieldInfo RotateHandles = typeof(GizmoRotate).GetField("handles", Private);
+        private static readonly FieldInfo RotateHandleAxis = typeof(GizmoRotateHandle).GetField("a0", Private);
+        private static readonly MethodInfo OffsetMoveStart = typeof(GizmoOffset).GetMethod("OnHandleMoveStart", Private);
+        private static readonly MethodInfo OffsetMove = typeof(GizmoOffset).GetMethod("OnHandleMove", Private);
+        private static readonly MethodInfo OffsetMoveEnd = typeof(GizmoOffset).GetMethod("OnHandleMoveEnd", Private);
+        private static readonly MethodInfo RotateStart = typeof(GizmoRotate).GetMethod("OnHandleRotateStart", Private);
+        private static readonly MethodInfo RotateTurn = typeof(GizmoRotate).GetMethod("OnHandleRotate", Private);
+        private static readonly MethodInfo RotateEnd = typeof(GizmoRotate).GetMethod("OnHandleRotateEnd", Private);
+
         public static IEnumerable<Tool> All()
         {
             yield return new Tool("locate_part",
@@ -85,6 +113,20 @@ namespace com.github.lhervier.ksp.util.mcpserver
                     Schema.P("panel", "string", "open or close (default: left as it is)"),
                     Schema.P("tool", "string", "place, move or rotate (default: left as it is)")),
                 ConstructionTool);
+            yield return new Tool("construction_gizmo",
+                "Drags the gizmo of the part selected in EVA construction, as a player drags one of its handles with " +
+                "the mouse: with the Move tool, along the x, y or z axis of the gizmo by distance metres; with the " +
+                "Rotate tool, around it by angle degrees. The drag is spread over steps frames, one move per frame, " +
+                "with the game's snapping applied as the handle applies it, then released, so that the game and the " +
+                "mods see every step and the release. Answers with the axis in world space, what was asked, what the " +
+                "snapping left of it and how far the part really went (along the axis, or around it), and the part's " +
+                "position at the end.",
+                Schema.Object(
+                    Schema.P("axis", "string", "x, y or z: an axis of the gizmo, in the frame it shows (Absolute or Local)", true),
+                    Schema.P("distance", "number", "Move tool: metres along the axis, negative the other way"),
+                    Schema.P("angle", "number", "Rotate tool: degrees around the axis, negative the other way"),
+                    Schema.P("steps", "number", "how many frames the drag is spread over (default " + DefaultGizmoSteps + ")")),
+                ConstructionGizmo);
         }
 
         private static IEnumerator LocatePart(ToolCall call)
@@ -267,6 +309,257 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 { "selectedPart", selected != null ? (object)(double)selected.persistentId : null },
                 { "selectedTitle", selected != null ? selected.partInfo.title : null }
             });
+        }
+
+        private static IEnumerator ConstructionGizmo(ToolCall call)
+        {
+            if (!Require.Flight(call))
+            {
+                yield break;
+            }
+            EVAConstructionModeController controller = EVAConstructionModeController.Instance;
+            if (controller == null || !ConstructionOpen(controller))
+            {
+                call.Fail("The construction panel of EVA construction is not open");
+                yield break;
+            }
+            EVAConstructionModeEditor editor = controller.evaEditor;
+            if (editor.SelectedPart == null)
+            {
+                call.Fail("No part is selected in EVA construction");
+                yield break;
+            }
+            Vector3 localAxis;
+            if (!call.Choice("axis", null, GizmoAxes, out localAxis))
+            {
+                yield break;
+            }
+            int steps = (int)call.Number("steps", DefaultGizmoSteps);
+            if (steps < 1)
+            {
+                call.Fail("steps: at least 1");
+                yield break;
+            }
+            switch (editor.EVAConstructionMode)
+            {
+                case ConstructionMode.Move:
+                    yield return DragOffsetGizmo(call, editor, localAxis, steps);
+                    break;
+                case ConstructionMode.Rotate:
+                    yield return DragRotateGizmo(call, editor, localAxis, steps);
+                    break;
+                default:
+                    call.Fail("The Place tool has no gizmo: pick the Move or Rotate tool");
+                    break;
+            }
+        }
+
+        // Drags the Move gizmo along an axis of its own, as GizmoOffsetHandle does from the mouse.
+        private static IEnumerator DragOffsetGizmo(ToolCall call, EVAConstructionModeEditor editor, Vector3 localAxis, int steps)
+        {
+            if (!call.Has("distance"))
+            {
+                call.Fail("distance: the metres to drag the Move gizmo by");
+                yield break;
+            }
+            float distance = (float)call.Number("distance");
+            GizmoOffset gizmo = (GizmoOffset)EditorGizmoOffset.GetValue(editor);
+            if (gizmo == null)
+            {
+                call.Fail("The Move gizmo is not up: the game does not let this part move");
+                yield break;
+            }
+            if (gizmo.IsDragging)
+            {
+                call.Fail("The Move gizmo is being dragged already");
+                yield break;
+            }
+
+            // The handle a player would grab: the one that points the most along the axis. A handle reports the
+            // drag along its own direction, from the gizmo's centre to itself, as On_MouseDown measures it.
+            Vector3 worldAxis = gizmo.transform.rotation * localAxis;
+            GizmoOffsetHandle handle = null;
+            Vector3 handleAxis = Vector3.zero;
+            float best = -1f;
+            foreach (GizmoOffsetHandle h in (GizmoOffsetHandle[])OffsetHandles.GetValue(gizmo))
+            {
+                Vector3 direction = (h.transform.position - gizmo.transform.position).normalized;
+                float alignment = Mathf.Abs(Vector3.Dot(direction, worldAxis));
+                if (alignment > best)
+                {
+                    best = alignment;
+                    handle = h;
+                    handleAxis = direction;
+                }
+            }
+            if (handle == null)
+            {
+                call.Fail("The Move gizmo has no handle");
+                yield break;
+            }
+            float sign = Mathf.Sign(Vector3.Dot(handleAxis, worldAxis));
+
+            Part part = editor.SelectedPart;
+            Vector3 start = part.transform.position;
+            float dragged = 0f;
+            OffsetMoveStart.Invoke(gizmo, new object[] { handle, handleAxis });
+            try
+            {
+                for (int i = 1; i <= steps; i++)
+                {
+                    yield return null;
+                    if (part == null || gizmo == null)
+                    {
+                        call.Fail("The part or its gizmo went away during the drag");
+                        yield break;
+                    }
+                    // The distance is counted from where the drag started, as the mouse's is.
+                    dragged = sign * distance * i / steps;
+                    if (gizmo.useGrid)
+                    {
+                        dragged -= dragged % gizmo.SnapInterval;
+                    }
+                    OffsetMove.Invoke(gizmo, new object[] { handle, handleAxis, dragged });
+                }
+            }
+            finally
+            {
+                // Released whatever happened, or the gizmo would keep its other handles locked.
+                if (gizmo != null)
+                {
+                    OffsetMoveEnd.Invoke(gizmo, new object[] { handle, handleAxis, dragged });
+                }
+            }
+            yield return null;
+            if (part == null)
+            {
+                call.Fail("The part went away after the drag");
+                yield break;
+            }
+            Vector3 moved = part.transform.position - start;
+            call.Text(new Dictionary<string, object>
+            {
+                { "part", (double)part.persistentId },
+                { "tool", "Move" },
+                { "coordSpace", gizmo.CoordSpace.ToString() },
+                { "axis", Vector(worldAxis) },
+                { "snap", gizmo.useGrid },
+                { "asked", (double)distance },
+                { "dragged", (double)(sign * dragged) },
+                { "moved", (double)Vector3.Dot(moved, worldAxis) },
+                { "movedOffAxis", (double)Vector3.ProjectOnPlane(moved, worldAxis).magnitude },
+                { "position", Vector(part.transform.position) }
+            });
+        }
+
+        // Turns the Rotate gizmo around an axis of its own, as GizmoRotateHandle does from the mouse.
+        private static IEnumerator DragRotateGizmo(ToolCall call, EVAConstructionModeEditor editor, Vector3 localAxis, int steps)
+        {
+            if (!call.Has("angle"))
+            {
+                call.Fail("angle: the degrees to turn the Rotate gizmo by");
+                yield break;
+            }
+            float angle = (float)call.Number("angle");
+            GizmoRotate gizmo = (GizmoRotate)EditorGizmoRotate.GetValue(editor);
+            if (gizmo == null)
+            {
+                call.Fail("The Rotate gizmo is not up: the game does not let this part turn");
+                yield break;
+            }
+            if (gizmo.IsDragging)
+            {
+                call.Fail("The Rotate gizmo is being dragged already");
+                yield break;
+            }
+
+            // The ring a player would grab: the one whose axis, in the gizmo's frame, is the axis asked for. A ring
+            // reports the turn around its axis in world space, as On_MouseDown measures it.
+            GizmoRotateHandle handle = null;
+            Vector3 ringAxis = Vector3.zero;
+            float best = -1f;
+            foreach (GizmoRotateHandle h in (GizmoRotateHandle[])RotateHandles.GetValue(gizmo))
+            {
+                Vector3 axis = (Vector3)RotateHandleAxis.GetValue(h);
+                float alignment = Mathf.Abs(Vector3.Dot(axis.normalized, localAxis));
+                if (alignment > best)
+                {
+                    best = alignment;
+                    handle = h;
+                    ringAxis = axis;
+                }
+            }
+            if (handle == null)
+            {
+                call.Fail("The Rotate gizmo has no ring");
+                yield break;
+            }
+            float sign = Mathf.Sign(Vector3.Dot(ringAxis, localAxis));
+            Vector3 worldAxis = gizmo.transform.rotation * ringAxis;
+
+            Part part = editor.SelectedPart;
+            Quaternion start = part.transform.rotation;
+            float turned = 0f;
+            RotateStart.Invoke(gizmo, new object[] { handle, worldAxis });
+            try
+            {
+                for (int i = 1; i <= steps; i++)
+                {
+                    yield return null;
+                    if (part == null || gizmo == null)
+                    {
+                        call.Fail("The part or its gizmo went away during the drag");
+                        yield break;
+                    }
+                    // The angle is counted from where the drag started, as the mouse's is.
+                    turned = sign * angle * i / steps;
+                    if (gizmo.useAngleSnap)
+                    {
+                        turned -= turned % gizmo.SnapDegrees;
+                    }
+                    RotateTurn.Invoke(gizmo, new object[] { handle, worldAxis, turned });
+                }
+            }
+            finally
+            {
+                // Released whatever happened, or the gizmo would keep its other rings locked.
+                if (gizmo != null)
+                {
+                    RotateEnd.Invoke(gizmo, new object[] { handle, worldAxis, turned });
+                }
+            }
+            yield return null;
+            if (part == null)
+            {
+                call.Fail("The part went away after the drag");
+                yield break;
+            }
+            // The turn the part really made, signed around the axis asked for.
+            float rotated;
+            Vector3 rotationAxis;
+            (part.transform.rotation * Quaternion.Inverse(start)).ToAngleAxis(out rotated, out rotationAxis);
+            if (rotated > 180f)
+            {
+                rotated -= 360f;
+            }
+            Vector3 askedAxis = sign * worldAxis;
+            call.Text(new Dictionary<string, object>
+            {
+                { "part", (double)part.persistentId },
+                { "tool", "Rotate" },
+                { "coordSpace", gizmo.CoordSpace.ToString() },
+                { "axis", Vector(askedAxis) },
+                { "snap", gizmo.useAngleSnap },
+                { "asked", (double)angle },
+                { "turned", (double)(sign * turned) },
+                { "rotated", (double)(rotated * Mathf.Sign(Vector3.Dot(rotationAxis, askedAxis))) },
+                { "position", Vector(part.transform.position) }
+            });
+        }
+
+        private static Dictionary<string, object> Vector(Vector3 v)
+        {
+            return new Dictionary<string, object> { { "x", (double)v.x }, { "y", (double)v.y }, { "z", (double)v.z } };
         }
 
         /// <summary>Whether the construction panel of EVA construction is open, its tools ready.</summary>

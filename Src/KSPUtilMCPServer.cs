@@ -60,6 +60,13 @@ namespace com.github.lhervier.ksp.util.mcpserver
         {
             Subscribe();
             Log.Flush();
+            if (_server != null && _server.Unresponsive)
+            {
+                // Nothing reaches the game any more: a port that answers nobody is worse than a fresh one.
+                Log.Error("The server stopped answering: starting it again");
+                StopListening(now: true);
+                StartListening();
+            }
             MainThread.Pump();
         }
 
@@ -117,10 +124,11 @@ namespace com.github.lhervier.ksp.util.mcpserver
             return _server != null;
         }
 
-        // Closes the port and stops the tools still running, so that nothing drives the game any more.
-        private void StopListening()
+        // Closes the port and stops the tools still running, so that nothing drives the game any more; with now,
+        // without waiting for the answers being written.
+        private void StopListening(bool now = false)
         {
-            _server.Stop();
+            _server.Stop(now);
             _server = null;
             List<MainThread.Job> stopped = MainThread.Cancel(job => true, "the server was turned off");
             Log.Info("Turned off" + (stopped.Count > 0 ? ", stopping " + stopped.Count + " running tool(s)" : ""));

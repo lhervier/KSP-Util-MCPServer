@@ -34,6 +34,11 @@ and the tools of other mods — run at any time: `get_state` answers while `driv
 stopped when its client cancels the call (`notifications/cancelled` of MCP), or after ten minutes; it
 then lets go of what it holds, the wheels of a rover say.
 
+A request whose body or answer takes over 30 seconds to go through has its connection dropped, so that a
+client gone silent cannot hold the server. The server also asks itself, every 15 seconds, whether it still
+answers: after two checks in a row without an answer, it closes its port and opens it again, and says so in
+`KSP.log`. Turned off from the toolbar, it gives its port back within 5 seconds, whatever its requests do.
+
 Flight is reached as a player reaches it: through the space centre. From the main menu, `open_game` and
 `new_game` go to the space centre; from there or one of its editors, `launch_vessel` launches a vessel and `load_save` loads a save,
 which it also reloads in flight. A flight reached straight from the main menu, the space centre never loaded
@@ -96,6 +101,7 @@ paints the ground of Kerbin with the wrong texture until the space centre has be
 | `locate_part` | where a part is on screen: the rectangle its colliders cover, how much of it shows, and a point where the mouse is over it, found by casting rays as the game does to find the part under the mouse; its colliders and how many are triggers, and how far it leans from the vertical; with `find_view`, first turns the camera to where the most of it shows |
 | `aim_camera` | aims the camera at a part, as the *Aim Camera* button of its action window does, or back at the active vessel, as *Reset Camera* does |
 | `construction_tool` | opens or closes the construction panel of EVA construction, as its toolbar button does, and picks its Place, Move or Rotate tool, as its buttons do; answers with the tool in use and the part selected |
+| `construction_gizmo` | drags the gizmo of the part selected in EVA construction, as a player drags one of its handles: along an axis of the Move gizmo by some metres, or around an axis of the Rotate gizmo by some degrees, over a number of frames, with the game's snapping; answers with how far the part really went |
 | `drive` | drives a rover along a heading, forward or backing away with its front facing it, at a speed, for a distance or until the floating origin moves; slows down before the end and stops with the brakes on |
 | `drive_to` | drives a rover to a latitude and longitude, forward or in reverse, along the straight line from where it starts, and stops there with the brakes on, still; stops and turns round when the target falls behind |
 
