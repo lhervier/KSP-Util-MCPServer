@@ -8,7 +8,7 @@ using UnityEngine.UI;
 namespace com.github.lhervier.ksp.util.mcpserver
 {
     /// <summary>
-    /// Tools that work the part action windows (PAWs) of the active vessel's parts as the player does with the
+    /// Tools that work the part action windows (PAWs) of the loaded vessels' parts as the player does with the
     /// mouse: right click on a part or on empty space, the pin, the buttons of a window.
     /// </summary>
     internal static class PartMenuTools
@@ -22,12 +22,15 @@ namespace com.github.lhervier.ksp.util.mcpserver
         public static IEnumerable<Tool> All()
         {
             yield return new Tool("list_parts",
-                "Lists the parts of the active vessel: id (its persistent id, which the other part tools take), " +
-                "name, title, the resources it holds with their amount and capacity, and whether its part action " +
-                "window is open and pinned.",
-                Schema.Object(), ListParts) { Concurrent = true };
+                "Lists the parts of the active vessel, or of another loaded vessel: id (its persistent id, which the " +
+                "other part tools take), name, title, the resources it holds with their amount and capacity, and " +
+                "whether its part action window is open and pinned. On EVA, the active vessel is the kerbal: name the " +
+                "vessel to list the parts of the one being built.",
+                Schema.Object(
+                    Schema.P("vessel", "string", "the vessel's id or name, as list_vessels gives them (default: the active vessel)")),
+                ListParts) { Concurrent = true };
             yield return new Tool("part_menu",
-                "Works the part action windows of the active vessel's parts as the mouse does, then reads them as " +
+                "Works the part action windows of the loaded vessels' parts as the mouse does, then reads them as " +
                 "read_part_menus does. open: a right click on the part, without the modifier key, so the other " +
                 "windows close unless pinned. pin, unpin: the pin of the part's open window. move: drags the part's " +
                 "open window by its title bar until its top left corner is at x, y (pixels from the top left corner " +
@@ -69,8 +72,24 @@ namespace com.github.lhervier.ksp.util.mcpserver
             {
                 yield break;
             }
+            Vessel vessel = FlightGlobals.ActiveVessel;
+            if (call.Has("vessel"))
+            {
+                string error;
+                vessel = Lookup.FindVessel(call.String("vessel"), out error);
+                if (vessel == null)
+                {
+                    call.Fail(error);
+                    yield break;
+                }
+                if (!vessel.loaded)
+                {
+                    call.Fail(vessel.vesselName + " is not loaded: its parts are not in the scene");
+                    yield break;
+                }
+            }
             List<object> parts = new List<object>();
-            foreach (Part p in FlightGlobals.ActiveVessel.parts)
+            foreach (Part p in vessel.parts)
             {
                 List<object> resources = new List<object>();
                 foreach (PartResource r in p.Resources)
@@ -297,10 +316,10 @@ namespace com.github.lhervier.ksp.util.mcpserver
         }
 
         /// <summary>
-        /// Returns the part of the active vessel whose persistent id the call's "part" argument gives, or null
+        /// Returns the part of a loaded vessel whose persistent id the call's "part" argument gives, or null
         /// after failing the call.
         /// </summary>
-        private static Part FindPart(ToolCall call)
+        internal static Part FindPart(ToolCall call)
         {
             if (!call.Has("part"))
             {
@@ -308,14 +327,17 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 return null;
             }
             uint id = (uint)call.Number("part");
-            foreach (Part p in FlightGlobals.ActiveVessel.parts)
+            foreach (Vessel v in FlightGlobals.VesselsLoaded)
             {
-                if (p.persistentId == id)
+                foreach (Part p in v.parts)
                 {
-                    return p;
+                    if (p.persistentId == id)
+                    {
+                        return p;
+                    }
                 }
             }
-            call.Fail("The active vessel has no part of id " + id);
+            call.Fail("No loaded vessel has a part of id " + id);
             return null;
         }
 
