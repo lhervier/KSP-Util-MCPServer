@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using CommNet;
 
 namespace com.github.lhervier.ksp.util.mcpserver
 {
@@ -44,6 +45,11 @@ namespace com.github.lhervier.ksp.util.mcpserver
                     ? Planetarium.GetUniversalTime() : double.NaN },
                 { "warpRate", (double)TimeWarp.CurrentRate }
             };
+            // The row the alarm clock button, left of the time display, shows above it in flight.
+            if (HighLogic.LoadedSceneIsFlight && FlightUIModeController.Instance != null)
+            {
+                state["nextAlarmShowing"] = FlightUIModeController.Instance.NextAlarmShowing;
+            }
             Vessel v = HighLogic.LoadedSceneIsFlight ? FlightGlobals.ActiveVessel : null;
             if (v != null)
             {
@@ -73,9 +79,43 @@ namespace com.github.lhervier.ksp.util.mcpserver
                     vessel["localTime"] = Sun.Instance.GetLocalTimeAtPosition(v.latitude, v.longitude, v.mainBody);
                     vessel["solarDay"] = v.mainBody.solarDayLength;
                 }
+                vessel["commNet"] = CommNetState(v);
                 state["vessel"] = vessel;
             }
             return state;
+        }
+
+        /// <summary>
+        /// The vessel's link to the network, as the signal indicator of the flight view shows it: whether it is
+        /// connected, and each hop of its control path with its length. Null when CommNet is off.
+        /// </summary>
+        private static Dictionary<string, object> CommNetState(Vessel v)
+        {
+            CommNetVessel connection = v.connection;
+            if (connection == null || !CommNetScenario.CommNetEnabled)
+            {
+                return null;
+            }
+            List<object> hops = new List<object>();
+            if (connection.ControlPath != null)
+            {
+                foreach (CommLink link in connection.ControlPath)
+                {
+                    hops.Add(new Dictionary<string, object>
+                    {
+                        { "from", link.a != null ? link.a.name : null },
+                        { "to", link.b != null ? link.b.name : null },
+                        { "distance", link.cost }
+                    });
+                }
+            }
+            return new Dictionary<string, object>
+            {
+                { "connected", connection.IsConnected },
+                { "connectedHome", connection.IsConnectedHome },
+                { "signalStrength", connection.ControlPath != null ? connection.SignalStrength : 0.0 },
+                { "controlPath", hops }
+            };
         }
 
         /// <summary>The floating origin seen from the active vessel, as a dictionary ready to be written as JSON.</summary>

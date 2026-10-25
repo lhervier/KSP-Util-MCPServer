@@ -38,6 +38,15 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 "the game's window from its top left corner, as mouse_click takes them. An empty list when none is " +
                 "open.",
                 Schema.Object(), ReadDialogs) { Concurrent = true };
+            yield return new Tool("press_dialog_button",
+                "Presses a button of a dialog open over the scene, as a click does, then reads the dialogs as " +
+                "read_dialogs does: the button by its label, in the dialog whose title or name is given, or in any " +
+                "dialog. Refuses a button that does not show or does not respond, and a label shared by buttons of " +
+                "several dialogs when no dialog is named.",
+                Schema.Object(
+                    Schema.P("button", "string", "the button's label, as read_dialogs gives it (case ignored)", true),
+                    Schema.P("dialog", "string", "the dialog's title or name, as read_dialogs gives them (case ignored)")),
+                PressDialogButton);
         }
 
         private static IEnumerator ReadTrackingStation(ToolCall call)
@@ -205,6 +214,59 @@ namespace com.github.lhervier.ksp.util.mcpserver
             }
             place["inView"] = inView;
             return place;
+        }
+
+        private static IEnumerator PressDialogButton(ToolCall call)
+        {
+            string label = call.String("button", "");
+            string dialogName = call.String("dialog");
+            List<UnityEngine.UI.Button> matches = new List<UnityEngine.UI.Button>();
+            foreach (PopupDialog dialog in Object.FindObjectsOfType<PopupDialog>())
+            {
+                MultiOptionDialog content = dialog.dialogToDisplay;
+                if (content == null || content.Options == null)
+                {
+                    continue;
+                }
+                if (dialogName != null && !string.Equals(content.title, dialogName, System.StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(content.name, dialogName, System.StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+                List<DialogGUIButton> found = new List<DialogGUIButton>();
+                foreach (DialogGUIBase option in content.Options)
+                {
+                    SpaceCenterTools.CollectButtons(option, found);
+                }
+                foreach (DialogGUIButton button in found)
+                {
+                    if (button.uiItem != null && button.uiItem.activeInHierarchy
+                        && string.Equals(button.OptionText, label, System.StringComparison.OrdinalIgnoreCase))
+                    {
+                        matches.Add(button.uiItem.GetComponent<UnityEngine.UI.Button>());
+                    }
+                }
+            }
+            if (matches.Count == 0)
+            {
+                call.Fail("No dialog open shows a button " + label);
+                yield break;
+            }
+            if (matches.Count > 1)
+            {
+                call.Fail(matches.Count + " buttons read " + label + ": name the dialog");
+                yield break;
+            }
+            UnityEngine.UI.Button target = matches[0];
+            // A click reaches onClick only on a button that is interactable (Button.Press).
+            if (target == null || !target.IsInteractable())
+            {
+                call.Fail("The button " + label + " does not respond");
+                yield break;
+            }
+            target.onClick.Invoke();
+            yield return null;
+            yield return ReadDialogs(call);
         }
 
         private static IEnumerator ReadDialogs(ToolCall call)

@@ -24,7 +24,8 @@ namespace com.github.lhervier.ksp.util.mcpserver
             yield return new Tool("list_parts",
                 "Lists the parts of the active vessel, or of another loaded vessel: id (its persistent id, which the " +
                 "other part tools take), name, title, the resources it holds with their amount and capacity, and " +
-                "whether its part action window is open and pinned. On EVA, the active vessel is the kerbal: name the " +
+                "whether its part action window is open and pinned, and for a wheel, whether it touches the ground. On " +
+                "EVA, the active vessel is the kerbal: name the " +
                 "vessel to list the parts of the one being built.",
                 Schema.Object(
                     Schema.P("vessel", "string", "the vessel's id or name, as list_vessels gives them (default: the active vessel)")),
@@ -102,7 +103,7 @@ namespace com.github.lhervier.ksp.util.mcpserver
                     });
                 }
                 UIPartActionWindow window = OpenWindow(p);
-                parts.Add(new Dictionary<string, object>
+                Dictionary<string, object> part = new Dictionary<string, object>
                 {
                     { "id", (double)p.persistentId },
                     { "name", p.partInfo.name },
@@ -110,7 +111,13 @@ namespace com.github.lhervier.ksp.util.mcpserver
                     { "resources", resources },
                     { "menuOpen", window != null },
                     { "menuPinned", window != null && window.Pinned }
-                });
+                };
+                ModuleWheelBase wheel = p.FindModuleImplementing<ModuleWheelBase>();
+                if (wheel != null)
+                {
+                    part["wheel"] = new Dictionary<string, object> { { "grounded", wheel.isGrounded } };
+                }
+                parts.Add(part);
             }
             call.Text(parts);
         }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;
 using UnityEngine;
 
 namespace com.github.lhervier.ksp.util.mcpserver
@@ -34,7 +35,8 @@ namespace com.github.lhervier.ksp.util.mcpserver
 
         /// <summary>
         /// Waits until the scene of <paramref name="watch"/> has loaded, then stops the watch, also when the
-        /// wait ends early; fails the call after three minutes.
+        /// wait ends early; fails the call after three minutes. The space centre is waited for until it is
+        /// ready to be left (see <see cref="ForSpaceCentre"/>).
         /// </summary>
         public static IEnumerator ForScene(ToolCall call, SceneWatch watch)
         {
@@ -46,6 +48,10 @@ namespace com.github.lhervier.ksp.util.mcpserver
             finally
             {
                 watch.Stop();
+            }
+            if (!call.IsError && watch.Scene == GameScenes.SPACECENTER)
+            {
+                yield return ForSpaceCentre();
             }
         }
 
@@ -89,17 +95,30 @@ namespace com.github.lhervier.ksp.util.mcpserver
             call.Text(GameState.State());
         }
 
+        /// <summary>The surface object that carries the space centre's camera, private to SpaceCenterCamera2.</summary>
+        private static readonly FieldInfo CameraPivot =
+            typeof(SpaceCenterCamera2).GetField("srfPivot", BindingFlags.Instance | BindingFlags.NonPublic);
+
         /// <summary>
-        /// Waits until every building of the space centre has set up its colliders, or 10 seconds at most.
+        /// Waits until the space centre can be left without harm, or 10 seconds at most: every building has set
+        /// up its colliders, and the camera has taken its place.
         /// </summary>
-        public static IEnumerator ForBuildingColliders()
+        public static IEnumerator ForSpaceCentre()
         {
-            // SpaceCenterBuilding.Start sets them up two frames after it starts, once its SetupFacility is over.
-            // Leaving the space centre in that very frame leaves them in the next scene with no building, where
-            // each frame of the mouse over one of them throws in SpaceCenterBuildingCollider.OnMouseOver.
+            // SpaceCenterBuilding.Start sets up the colliders two frames after it starts, once its SetupFacility is
+            // over. Leaving the space centre in that very frame leaves them in the next scene with no building,
+            // where each frame of the mouse over one of them throws in SpaceCenterBuildingCollider.OnMouseOver.
+            // SpaceCenterCamera2.Start hands its pivot to a SurfaceObject that moves it to the scene's root three
+            // frames later. Left before, the pivot cannot go back to its parent, the next visits do not find it,
+            // and the space centre's camera stays lost, far over the sea, until KSP is restarted.
             float start = Time.realtimeSinceStartup;
             while (Time.realtimeSinceStartup - start < 10f)
             {
+                if (!CameraReady())
+                {
+                    yield return null;
+                    continue;
+                }
                 var withColliders = new HashSet<SpaceCenterBuilding>();
                 foreach (SpaceCenterBuildingCollider collider in UnityEngine.Object.FindObjectsOfType<SpaceCenterBuildingCollider>())
                 {
@@ -115,6 +134,19 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 }
                 yield return null;
             }
+        }
+
+        /// <summary>Whether the space centre's camera has its pivot in place, or cannot get it any more.</summary>
+        private static bool CameraReady()
+        {
+            SpaceCenterCamera2 camera = UnityEngine.Object.FindObjectOfType<SpaceCenterCamera2>();
+            if (camera == null || CameraPivot == null)
+            {
+                return true;
+            }
+            // No pivot once Start is over: the camera was already lost on an earlier visit, nothing to wait for.
+            SurfaceObject pivot = (SurfaceObject)CameraPivot.GetValue(camera);
+            return pivot == null ? Time.timeSinceLevelLoad > 1f : pivot.IsPopped;
         }
     }
 

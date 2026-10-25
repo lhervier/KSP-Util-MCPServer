@@ -59,7 +59,8 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 "the mouse, how much of the part shows (the share of the rays that meet the part and meet it first) " +
                 "and a point where the mouse would be over this part, with the interface objects drawn over that " +
                 "point. Also the colliders of the part, how many are triggers (a trigger collides with nothing), and " +
-                "whether it is the part selected in EVA construction. With find_view, first turns the flight camera " +
+                "whether it is the part selected in EVA construction, and how far it leans: the angle between its up " +
+                "axis and the vertical of the body below it. With find_view, first turns the flight camera " +
                 "around what it aims at (aim_camera) to the heading and pitch where the most of the part shows clear of the " +
                 "interface.",
                 Schema.Object(
@@ -516,6 +517,8 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 { "colliders", colliders.Count },
                 { "triggers", triggers },
                 { "selectedInConstruction", selected },
+                // The part's up axis against the vertical where it is: 0 for a part standing as on the launch pad.
+                { "tilt", (double)Vector3.Angle(part.transform.up, (Vector3)FlightGlobals.getUpAxis(part.vessel.mainBody, part.transform.position)) },
                 { "inFront", sight.InFront }
             };
             if (sight.InFront)

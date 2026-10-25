@@ -12,6 +12,12 @@ What is left to do on KSP-Util-MCPServer, most urgent first.
   turn and never asks for more than a quarter of the local gravity sideways: on Kerbin, the small
   Diag2-Rover, which rolled over turning 90° at 15 m/s, now takes that turn on its wheels. To try with the
   rover of 18 parts, whose centre of mass stands higher.
+- **`set_position` under the colliders of a static**: on the runway and on the grass near the space centre, a
+  vessel is lowered onto the terrain (64.8 m) beneath an invisible collider of the space centre's statics (about
+  69.2 m), since it is held a few metres above the terrain, below that collider; when the save is loaded again, KSP
+  raises it by 4.4 m. Hold the vessel above whatever lies highest under it, statics included. Also: a kerbal moved
+  right after leaving the hatch, still on the ladder, was destroyed while held ("destroyed while it was held above
+  the ground"); a few seconds later, the same move works.
 - **`set_position` over a long jump, in Real Solar System and with a large rover**: the vessel crashed
   through the terrain after a long jump, on Kerbin and near Kourou in Real Solar System. Two causes, both
   fixed: the ground of the arrival had no collider yet when physics resumed, and the vessel was let go

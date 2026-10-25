@@ -15,8 +15,11 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 "Reads the game: the folder of the KSP that answers, scene, pause, universal time, time warp rate, and for the active vessel its id, " +
                 "name, situation, latitude, longitude, altitude, height above the terrain, surface speed, heading " +
                 "(degrees from north, towards east), pitch (degrees above the horizon, as the navball shows it), " +
-                "brakes, lights, gear, SAS, and the local time where it is (the fraction of " +
-                "its body's solar day, 0.5 at noon) with the length of that day in seconds.",
+                "brakes, lights, gear, SAS, the local time where it is (the fraction of " +
+                "its body's solar day, 0.5 at noon) with the length of that day in seconds, and its link to the " +
+                "CommNet network: connected or not, signal strength, and each hop of its control path with its " +
+                "length in metres. In flight, also whether the next alarm shows above the time display, as the " +
+                "alarm clock button left of it toggles it.",
                 Schema.Object(), GetState) { Concurrent = true };
             yield return new Tool("get_floating_origin",
                 "Reads KSP's floating origin, the point the world is kept centred on: the active vessel's " +

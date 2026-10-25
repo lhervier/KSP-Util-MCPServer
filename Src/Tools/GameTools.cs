@@ -155,7 +155,6 @@ namespace com.github.lhervier.ksp.util.mcpserver
             {
                 yield break;
             }
-            yield return Waits.ForBuildingColliders();
             call.Text(GameState.State());
         }
 

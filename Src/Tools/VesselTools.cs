@@ -1,6 +1,8 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using UnityEngine;
 
 namespace com.github.lhervier.ksp.util.mcpserver
@@ -35,11 +37,9 @@ namespace com.github.lhervier.ksp.util.mcpserver
                     Schema.P("kerbal", "string", "the crew member's name (default: the first one aboard)")),
                 GoEva);
             yield return new Tool("set_cheats",
-                "Turns on or off the cheats of the Alt+F12 menu given; those left out are kept. Answers with " +
-                "their state.",
-                Schema.Object(
-                    Schema.P("infinite_electricity", "boolean", "Infinite Electricity"),
-                    Schema.P("infinite_fuel", "boolean", "Infinite Fuel")),
+                "Turns on or off the cheats of the Cheats tab of the Alt+F12 menu given; those left out are kept. " +
+                "Answers with the state of them all.",
+                Schema.Object(Cheats.ConvertAll(c => Schema.P(c.Name, "boolean", c.Label)).ToArray()),
                 SetCheats) { Concurrent = true };
             yield return new Tool("set_position",
                 "Moves the active vessel above a point of a body, as Set Position of the Alt+F12 menu does, in the " +
@@ -211,22 +211,55 @@ namespace com.github.lhervier.ksp.util.mcpserver
             }
         }
 
+        /// <summary>One cheat of the Alt+F12 menu: the argument that sets it, its label in the menu, its field.</summary>
+        private sealed class Cheat
+        {
+            public readonly string Name;
+            public readonly string Label;
+            public readonly FieldInfo Field;
+
+            public Cheat(string name, string label, string field)
+            {
+                Name = name;
+                Label = label;
+                Field = typeof(CheatOptions).GetField(field, BindingFlags.Public | BindingFlags.Static);
+            }
+        }
+
+        /// <summary>The cheats of the Cheats tab of the Alt+F12 menu, in its order.</summary>
+        private static readonly List<Cheat> Cheats = new List<Cheat>
+        {
+            new Cheat("unbreakable_joints", "Unbreakable Joints", "UnbreakableJoints"),
+            new Cheat("no_crash_damage", "No Crash Damage", "NoCrashDamage"),
+            new Cheat("ignore_max_temperature", "Ignore Max Temperature", "IgnoreMaxTemperature"),
+            new Cheat("infinite_fuel", "Infinite Propellant", "InfinitePropellant"),
+            new Cheat("infinite_electricity", "Infinite Electricity", "InfiniteElectricity"),
+            new Cheat("biomes_visible", "Biomes Visible in Map View", "BiomesVisible"),
+            new Cheat("allow_part_clipping", "Allow Part Clipping", "AllowPartClipping"),
+            new Cheat("non_strict_attachment_orientation", "Non Strict Part Attachment Orientation Checks",
+                "NonStrictAttachmentOrientation"),
+            new Cheat("ignore_agency_mindset", "Ignore Agency Mindset on Contracts", "IgnoreAgencyMindsetOnContracts"),
+            new Cheat("ignore_eva_construction_mass_limit", "Ignore EVA Construction Mass Limit",
+                "IgnoreEVAConstructionMassLimit"),
+            new Cheat("ignore_kerbal_inventory_limits", "Ignore Kerbal Inventory Limits", "IgnoreKerbalInventoryLimits")
+        };
+
         private static IEnumerator SetCheats(ToolCall call)
         {
-            if (call.Has("infinite_electricity"))
+            foreach (Cheat cheat in Cheats)
             {
-                CheatOptions.InfiniteElectricity = call.Bool("infinite_electricity");
-            }
-            if (call.Has("infinite_fuel"))
-            {
-                CheatOptions.InfinitePropellant = call.Bool("infinite_fuel");
+                if (call.Has(cheat.Name))
+                {
+                    cheat.Field.SetValue(null, call.Bool(cheat.Name));
+                }
             }
             yield return null;
-            call.Text(new Dictionary<string, object>
+            Dictionary<string, object> state = new Dictionary<string, object>();
+            foreach (Cheat cheat in Cheats)
             {
-                { "infinite_electricity", CheatOptions.InfiniteElectricity },
-                { "infinite_fuel", CheatOptions.InfinitePropellant }
-            });
+                state[cheat.Name] = (bool)cheat.Field.GetValue(null);
+            }
+            call.Text(state);
         }
 
         private static IEnumerator SetPosition(ToolCall call)

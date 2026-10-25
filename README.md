@@ -43,7 +43,7 @@ paints the ground of Kerbin with the wrong texture until the space centre has be
 
 | tool | what it does |
 |---|---|
-| `get_state` | the scene, the pause, the time, the time warp rate, and the active vessel: id, name, situation, latitude, longitude, altitude, height above the terrain, speed, heading, pitch, brakes, lights, gear, SAS, the local time where it is and the length of its body's day |
+| `get_state` | the scene, the pause, the time, the time warp rate, and the active vessel: id, name, situation, latitude, longitude, altitude, height above the terrain, speed, heading, pitch, brakes, lights, gear, SAS, the local time where it is and the length of its body's day, its CommNet link (connected, signal strength, each hop of its control path with its length); in flight, whether the next alarm shows above the time display |
 | `get_floating_origin` | the floating origin KSP keeps the world centred on: the vessel's distance from it, where it lies from the vessel (north, east, up), the distance at which KSP moves it, the moves since the scene opened |
 | `open_game` | opens a game's `persistent` save from any scene, the main menu included, as *Resume Game* does: always at the space centre, written back as `persistent`; returns once the buildings are set up |
 | `new_game` | starts a new career, science or sandbox game from the main menu, as *New Game* does at the Normal difficulty; a career's starting funds and funds penalties can be changed as the sliders of the Custom difficulty do |
@@ -65,13 +65,14 @@ paints the ground of Kerbin with the wrong texture until the space centre has be
 | `mouse_click` | clicks the left or right button at a point of the game's window: moves the pointer there, presses and releases the button, and answers once the game has seen both, as `mouse_move` answers; or double-clicks, two clicks in a row as a player's |
 | `read_tracking_station` | the tracking station as the player sees it: each row of its list from the top, with its vessel, whether it looks selected, where it lies on screen, and whether it lies within the visible part of the scrolled list; when another mod hides the station's list and shows its own rows instead, those rows (toggles of a toggle group labelled with a tracked vessel's name), `listReplaced`, and the station's own rows, hidden, with whether each is lit; the vessel selected; whether *Fly*, *Recover*, *Terminate* and *Track* show and respond, and where; points as `mouse_click` takes them |
 | `read_dialogs` | the dialogs open over the scene: name, title, message, and their buttons with their label, whether each responds, and the middle of each on screen, as `mouse_click` takes it |
+| `press_dialog_button` | presses a button of a dialog open over the scene, by its label, as a click does, in the dialog named or in any |
 | `set_time` | sets the universal time of the game: the time of day at a spot |
 | `set_warp` | sets the time warp, on rails or in physics warp, as the `.` and `,` keys do, with Alt or without |
 | `warp_to` | warps to a universal time, as *Warp To* of a manoeuvre node or of the map view does |
 | `warp_to_morning` | warps to the next morning where the active vessel is, as the button of the time warp gauge does, or to another time of the local solar day |
 | `set_pause` | pauses or resumes the flight |
 | `wait` | lets the game run for a number of seconds |
-| `set_cheats` | turns cheats of the `Alt+F12` menu on or off: *Infinite Electricity* and *Infinite Fuel* |
+| `set_cheats` | turns the cheats of the Cheats tab of the `Alt+F12` menu on or off: *Unbreakable Joints*, *No Crash Damage*, *Ignore Max Temperature*, *Infinite Propellant*, *Infinite Electricity* and the others |
 | `set_position` | moves the active vessel to a point of a body, as *Set Position* of the `Alt+F12` menu does, in the attitude it had against its local horizon (or turned to a heading): holds it still a few metres up until the ground and what stands on it are built under it, lowers it to a given height above whatever lies under it, lets it go, and answers once it has settled; refuses a point where it would reach another vessel |
 | `get_terrain` | the terrain of a body at a point: its height, whether the sea covers it, its slope and roughness |
 | `list_rocs` | the surface features of Breaking Ground near the active vessel: id, type, distance, where their pivot lies and its height above the terrain, their colliders, whether the vessel touches them |
@@ -88,11 +89,11 @@ paints the ground of Kerbin with the wrong texture until the space centre has be
 | `set_controls` | holds the wheel throttle and steering, and sets the brakes |
 | `set_flight` | sets the main throttle, turns SAS on or off and chooses its mode, as the pilot's keys do |
 | `stage` | activates the next stage, as the space bar does |
-| `list_parts` | the parts of the active vessel, or of another loaded vessel (on EVA, the one being built): the id the part tools take, name, title, resources, whether its part action window is open and pinned |
+| `list_parts` | the parts of the active vessel, or of another loaded vessel (on EVA, the one being built): the id the part tools take, name, title, resources, whether its part action window is open and pinned, and for a wheel whether it touches the ground |
 | `part_menu` | opens a part's action window as a right click on it does (the windows not pinned close), pins or unpins it, drags it to a point of the screen by its title bar, or closes every window not pinned as a right click on empty space does |
 | `read_part_menus` | the open part action windows, where they are on screen and what they show: buttons, fields, resources, and the resource transfer controls with their buttons, state and links to the other parts' |
 | `press_part_button` | presses a button of a part's action window, by its label or the name of its event (the same in every language of the game), or the In, Out or Stop button of a resource transfer |
-| `locate_part` | where a part is on screen: the rectangle its colliders cover, how much of it shows, and a point where the mouse is over it, found by casting rays as the game does to find the part under the mouse; its colliders and how many are triggers; with `find_view`, first turns the camera to where the most of it shows |
+| `locate_part` | where a part is on screen: the rectangle its colliders cover, how much of it shows, and a point where the mouse is over it, found by casting rays as the game does to find the part under the mouse; its colliders and how many are triggers, and how far it leans from the vertical; with `find_view`, first turns the camera to where the most of it shows |
 | `aim_camera` | aims the camera at a part, as the *Aim Camera* button of its action window does, or back at the active vessel, as *Reset Camera* does |
 | `construction_tool` | opens or closes the construction panel of EVA construction, as its toolbar button does, and picks its Place, Move or Rotate tool, as its buttons do; answers with the tool in use and the part selected |
 | `drive` | drives a rover along a heading, forward or backing away with its front facing it, at a speed, for a distance or until the floating origin moves; slows down before the end and stops with the brakes on |
