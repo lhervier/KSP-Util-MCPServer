@@ -34,6 +34,35 @@ namespace com.github.lhervier.ksp.util.mcpserver
         }
 
         /// <summary>
+        /// Brings the time warp, on rails or physics, back to normal time if it runs, and waits until physics runs
+        /// on the active vessel at normal time; fails the call after 30 seconds.
+        /// </summary>
+        public static IEnumerator ForNormalTime(ToolCall call)
+        {
+            if (TimeWarp.CurrentRateIndex != 0)
+            {
+                TimeWarp.SetRate(0, true);
+            }
+            yield return Until(call, () => TimeWarp.CurrentRate == 1f && FlightGlobals.ActiveVessel != null
+                    && !FlightGlobals.ActiveVessel.packed,
+                30f, "Physics was not running on the active vessel 30 s after the time warp was stopped");
+        }
+
+        /// <summary>
+        /// Leaves the map view for the flight view if it shows, and waits until the game shows the flight view;
+        /// fails the call after 10 seconds.
+        /// </summary>
+        public static IEnumerator ForFlightView(ToolCall call)
+        {
+            if (!MapView.MapIsEnabled)
+            {
+                yield break;
+            }
+            MapView.ExitMapView();
+            yield return Until(call, () => !MapView.MapIsEnabled, 10f, "The game did not leave the map view");
+        }
+
+        /// <summary>
         /// Waits until the scene of <paramref name="watch"/> has loaded, then stops the watch, also when the
         /// wait ends early; fails the call after three minutes. The space centre is waited for until it is
         /// ready to be left (see <see cref="ForSpaceCentre"/>).

@@ -17,6 +17,21 @@ namespace com.github.lhervier.ksp.util.mcpserver
             return false;
         }
 
+        /// <summary>The flight scene ready, with an active vessel that has not been destroyed.</summary>
+        public static bool LiveVessel(ToolCall call)
+        {
+            if (!Flight(call))
+            {
+                return false;
+            }
+            if (FlightGlobals.ActiveVessel.state == Vessel.State.DEAD)
+            {
+                call.Fail("The active vessel " + FlightGlobals.ActiveVessel.vesselName + " was destroyed: load a save");
+                return false;
+            }
+            return true;
+        }
+
         /// <summary>The flight scene, ready or not.</summary>
         public static bool FlightScene(ToolCall call)
         {

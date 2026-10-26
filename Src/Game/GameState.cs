@@ -72,6 +72,11 @@ namespace com.github.lhervier.ksp.util.mcpserver
                     { "gear", v.ActionGroups[KSPActionGroup.Gear] },
                     { "sas", v.ActionGroups[KSPActionGroup.SAS] }
                 };
+                // A vessel that crashed stays the active one, with the situation it had, until the flight is left.
+                if (v.state == Vessel.State.DEAD)
+                {
+                    vessel["destroyed"] = true;
+                }
                 // As the day and night switches of the space centre read it, which turn its lights on before
                 // 0.25 and after 0.7.
                 if (Sun.Instance != null)

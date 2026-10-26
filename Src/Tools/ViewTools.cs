@@ -46,9 +46,19 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 SetUi) { Concurrent = true };
             yield return new Tool("map_view",
                 "Enters or leaves the map view of a flight, as the M key does, and answers once the game shows " +
-                "the view asked for. Refuses when the game would not take the key: the map toggle locked, or the " +
-                "map view not allowed in this game.",
-                Schema.Object(Schema.P("enabled", "boolean", "true to enter the map view, false to leave it", true)),
+                "the view asked for; centres the map's camera on a body or a vessel, as double-clicking it or " +
+                "Focus View of its menu does, and sets the camera's distance. Refuses when the game would not take " +
+                "the key: the map toggle locked, or the map view not allowed in this game. Answers with what the " +
+                "camera is centred on and its distance.",
+                Schema.Object(
+                    Schema.P("enabled", "boolean",
+                        "true to enter the map view, false to leave it (default: true with focus or distance, the " +
+                        "view kept otherwise)"),
+                    Schema.P("focus", "string",
+                        "the body's name, or else the vessel's id, or its name when no other vessel bears it"),
+                    Schema.P("distance", "number",
+                        "the camera's distance from what it is centred on, in units of the map (6 km each), within " +
+                        "the limits the game sets for it")),
                 MapViewTool);
             yield return new Tool("iva_view",
                 "Enters the IVA view of the active vessel, or leaves it for the flight view, as the C key does, " +
@@ -138,7 +148,22 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 call.Fail("No map view: not in flight");
                 yield break;
             }
-            bool enabled = call.Bool("enabled");
+            bool centring = call.Has("focus") || call.Has("distance");
+            bool enabled = call.Bool("enabled", centring || MapView.MapIsEnabled);
+            if (centring && !enabled)
+            {
+                call.Fail("focus and distance set the camera of the map view: they need enabled true");
+                yield break;
+            }
+            MapObject focus = null;
+            if (call.Has("focus"))
+            {
+                focus = MapTarget(call);
+                if (focus == null)
+                {
+                    yield break;
+                }
+            }
             if (MapView.MapIsEnabled != enabled)
             {
                 // The checks the M key goes through, in MapView.Update: a locked toggle, or a game whose map
@@ -171,7 +196,61 @@ namespace com.github.lhervier.ksp.util.mcpserver
             // The interface of the view follows a frame later.
             yield return null;
             yield return null;
-            call.Text(new Dictionary<string, object> { { "enabled", MapView.MapIsEnabled } });
+            PlanetariumCamera camera = PlanetariumCamera.fetch;
+            if (focus != null)
+            {
+                // The overload a double click ends in: it re-parents the camera's pivot and keeps the distance
+                // within the limits of the new target.
+                camera.SetTarget(focus);
+            }
+            if (call.Has("distance"))
+            {
+                camera.SetDistance((float)call.Number("distance"));
+            }
+            if (centring)
+            {
+                yield return null;
+            }
+            Dictionary<string, object> answer = new Dictionary<string, object> { { "enabled", MapView.MapIsEnabled } };
+            if (camera != null && camera.target != null)
+            {
+                answer["focus"] = camera.target.GetName();
+                answer["focusType"] = camera.target.type.ToString();
+                answer["distance"] = (double)camera.Distance;
+            }
+            call.Text(answer);
+        }
+
+        /// <summary>
+        /// The map object the <c>focus</c> argument names: a body's, by its name, or else a vessel's, by its id or
+        /// name; null after failing the call when there is none.
+        /// </summary>
+        private static MapObject MapTarget(ToolCall call)
+        {
+            string name = call.String("focus");
+            foreach (CelestialBody body in FlightGlobals.Bodies)
+            {
+                if (string.Equals(body.bodyName, name, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (body.MapObject == null)
+                    {
+                        call.Fail(body.bodyName + " has no object in the map view");
+                    }
+                    return body.MapObject;
+                }
+            }
+            string error;
+            Vessel vessel = Lookup.FindVessel(name, out error);
+            if (vessel == null)
+            {
+                call.Fail("No body named " + name + ", and " + char.ToLowerInvariant(error[0]) + error.Substring(1));
+                return null;
+            }
+            if (vessel.mapObject == null)
+            {
+                call.Fail(vessel.vesselName + " has no object in the map view");
+            }
+            return vessel.mapObject;
         }
 
         private static IEnumerator Screenshot(ToolCall call)

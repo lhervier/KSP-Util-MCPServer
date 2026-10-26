@@ -43,7 +43,8 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 SetCheats) { Concurrent = true };
             yield return new Tool("set_position",
                 "Moves the active vessel above a point of a body, as Set Position of the Alt+F12 menu does, in the " +
-                "attitude it had against its local horizon before the move. It holds the vessel a few metres up, " +
+                "attitude it had against its local horizon before the move. It first leaves the map view, where the " +
+                "game builds no terrain, and stops the time warp. It holds the vessel a few metres up, " +
                 "still, until the ground and what stands on it are built under it, lowers it to the given height " +
                 "above whatever lies under it (the ground, a rock, a building), lets it go, and answers once it is " +
                 "landed (or splashed) and still, or after the time limit. Refuses a point where it would reach " +
@@ -62,7 +63,8 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 SetPosition);
             yield return new Tool("set_orbit",
                 "Puts the active vessel on an orbit, as Set Orbit of the Alt+F12 menu does, and waits until " +
-                "physics runs on it again.",
+                "physics runs on it again. Stops the time warp first: a landed vessel the warp holds on rails " +
+                "would stay where it is set, turning with the body.",
                 Schema.Object(
                     Schema.P("body", "string", "the body's name (default: the vessel's)"),
                     Schema.P("altitude", "number", "metres above the body's radius, for a circular orbit"),
@@ -264,7 +266,7 @@ namespace com.github.lhervier.ksp.util.mcpserver
 
         private static IEnumerator SetPosition(ToolCall call)
         {
-            if (!Require.Flight(call))
+            if (!Require.LiveVessel(call))
             {
                 yield break;
             }
@@ -302,6 +304,19 @@ namespace com.github.lhervier.ksp.util.mcpserver
             if (release < 0.0)
             {
                 call.Fail("altitude: a height above what lies under the vessel, not below it");
+                yield break;
+            }
+
+            // The map view deactivates the terrain of the vessel's body: nothing would be built under it. A vessel
+            // packed by the time warp would not go off rails to be held.
+            yield return Waits.ForFlightView(call);
+            if (call.IsError)
+            {
+                yield break;
+            }
+            yield return Waits.ForNormalTime(call);
+            if (call.IsError)
+            {
                 yield break;
             }
 
@@ -352,7 +367,7 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 {
                     call.Fail("Nothing under the vessel read the same for a second after " + HoldLimit + " s (" +
                         (double.IsInfinity(clearance) ? "nothing found under it" : clearance.ToString("F3") + " m under it") +
-                        "): it is left where it is held");
+                        "): it is let go where it is held, and falls");
                     yield break;
                 }
                 if (placed.packed)
@@ -405,7 +420,7 @@ namespace com.github.lhervier.ksp.util.mcpserver
                     Describe(under, under != null ? under.GetComponent<PQ>() : null));
                 if (double.IsInfinity(clearance))
                 {
-                    call.Fail("Nothing was found under the vessel once lowered: it is left where it is held");
+                    call.Fail("Nothing was found under the vessel once lowered: it is let go where it is held");
                     yield break;
                 }
             }
@@ -604,7 +619,7 @@ namespace com.github.lhervier.ksp.util.mcpserver
 
         private static IEnumerator SetOrbit(ToolCall call)
         {
-            if (!Require.Flight(call))
+            if (!Require.LiveVessel(call))
             {
                 yield break;
             }
@@ -620,6 +635,13 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 call.Fail("Give either altitude or sma");
                 yield break;
             }
+            // A landed vessel packed by the time warp keeps its orbit driver tracking its transform, the game does
+            // not pack it again for the move, and it would stay where it is set, turning with the body.
+            yield return Waits.ForNormalTime(call);
+            if (call.IsError)
+            {
+                yield break;
+            }
             FlightGlobals.fetch.SetShipOrbit(body, call.Number("eccentricity", 0.0), sma, call.Number("inclination", 0.0),
                 call.Number("lan", 0.0), call.Number("mean_anomaly", 0.0), call.Number("argument_of_periapsis", 0.0), 0.0);
             FloatingOrigin.ResetTerrainShaderOffset();
@@ -628,10 +650,17 @@ namespace com.github.lhervier.ksp.util.mcpserver
             yield return null;
             yield return Waits.Until(call, () => FlightGlobals.ActiveVessel != null && !FlightGlobals.ActiveVessel.packed,
                 60f, "Physics was not running on the vessel a minute after the orbit was set");
-            if (!call.IsError)
+            if (call.IsError)
             {
-                call.Text(GameState.State());
+                yield break;
             }
+            if (FlightGlobals.ActiveVessel.state == Vessel.State.DEAD)
+            {
+                // An orbit that runs under the terrain: the vessel crashes as physics resumes.
+                call.Fail("The vessel was destroyed once on its orbit: " + Json.Write(GameState.State()));
+                yield break;
+            }
+            call.Text(GameState.State());
         }
     }
 }

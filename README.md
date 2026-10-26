@@ -29,7 +29,7 @@ it: one message at a time, each tool's replacing the last, and never on a screen
 The tools that act on the game run one at a time: while one runs, another is refused at once, with the
 name of the one running. The tools that only read the game, and a few whose action gets in no one's way —
 `get_state`, `get_floating_origin`, `list_vessels`, `list_launch_sites`, `get_terrain`, `list_rocs`, `list_parts`, `read_part_menus`, `read_inventories`, `wait`, `screenshot`, `set_camera`, `aim_camera`,
-`set_ui`, `set_pause`, `set_cheats`, `set_focus_lock`, `stop_drive`, `quit_game`, `get_member`, `set_member`, `call_method`
+`set_ui`, `set_pause`, `set_cheats`, `set_focus_lock`, `stop_drive`, `quit_game`, `get_member`, `sample_members`, `set_member`, `call_method`
 and the tools of other mods — run at any time: `get_state` answers while `drive_to` drives. A tool is
 stopped when its client cancels the call (`notifications/cancelled` of MCP), or after ten minutes; it
 then lets go of what it holds, the wheels of a rover say.
@@ -48,7 +48,7 @@ paints the ground of Kerbin with the wrong texture until the space centre has be
 
 | tool | what it does |
 |---|---|
-| `get_state` | the scene, the pause, the time, the time warp rate, and the active vessel: id, name, situation, latitude, longitude, altitude, height above the terrain, speed, heading, pitch, brakes, lights, gear, SAS, the local time where it is and the length of its body's day, its CommNet link (connected, signal strength, each hop of its control path with its length); in flight, whether the next alarm shows above the time display |
+| `get_state` | the scene, the pause, the time, the time warp rate, and the active vessel: id, name, situation, latitude, longitude, altitude, height above the terrain, speed, heading, pitch, brakes, lights, gear, SAS, whether it was destroyed (a vessel that crashed stays the active one), the local time where it is and the length of its body's day, its CommNet link (connected, signal strength, each hop of its control path with its length); in flight, whether the next alarm shows above the time display |
 | `get_floating_origin` | the floating origin KSP keeps the world centred on: the vessel's distance from it, where it lies from the vessel (north, east, up), the distance at which KSP moves it, the moves since the scene opened |
 | `open_game` | opens a game's `persistent` save from any scene, the main menu included, as *Resume Game* does: always at the space centre, written back as `persistent`; returns once the buildings are set up |
 | `new_game` | starts a new career, science or sandbox game from the main menu, as *New Game* does at the Normal difficulty; a career's starting funds and funds penalties can be changed as the sliders of the Custom difficulty do |
@@ -64,7 +64,7 @@ paints the ground of Kerbin with the wrong texture until the space centre has be
 | `screenshot` | captures the screen, interface included but not the message of this mod; returns the image and saves it as a PNG |
 | `set_camera` | the flight camera's distance, heading and pitch, its field of view, and where it aims, as the middle mouse button does |
 | `set_ui` | hides or shows the game's interface in flight, as F2 does |
-| `map_view` | enters or leaves the map view of a flight, as the M key does, and answers once the game shows it; refuses when the game would ignore the key |
+| `map_view` | enters or leaves the map view of a flight, as the M key does, and answers once the game shows it; refuses when the game would ignore the key; centres the map's camera on a body or a vessel, as double-clicking it does, and sets the camera's distance |
 | `iva_view` | enters the IVA view of the active vessel or leaves it for the flight view, as the C key does, and answers once the game shows it; refuses when the game would ignore the key, and when the vessel has no crew to look through |
 | `mouse_move` | moves the mouse pointer to a point of the game's window, as a mouse does, in any scene, with or without the focus, the Windows session locked or not; answers with the pointer as Unity reads it and the interface objects under it, each with the object a click on it reaches |
 | `mouse_click` | clicks the left or right button at a point of the game's window: moves the pointer there, presses and releases the button, and answers once the game has seen both, as `mouse_move` answers; or double-clicks, two clicks in a row as a player's; with Shift, Ctrl or Alt held, or the game's modifier key |
@@ -79,10 +79,10 @@ paints the ground of Kerbin with the wrong texture until the space centre has be
 | `set_pause` | pauses or resumes the flight |
 | `wait` | lets the game run for a number of seconds |
 | `set_cheats` | turns the cheats of the Cheats tab of the `Alt+F12` menu on or off: *Unbreakable Joints*, *No Crash Damage*, *Ignore Max Temperature*, *Infinite Propellant*, *Infinite Electricity* and the others |
-| `set_position` | moves the active vessel to a point of a body, as *Set Position* of the `Alt+F12` menu does, in the attitude it had against its local horizon (or turned to a heading): holds it still a few metres up until the ground and what stands on it are built under it, lowers it to a given height above whatever lies under it, lets it go, and answers once it has settled; refuses a point where it would reach another vessel |
+| `set_position` | moves the active vessel to a point of a body, as *Set Position* of the `Alt+F12` menu does, leaving the map view (where the game builds no terrain) and stopping the time warp first, in the attitude it had against its local horizon (or turned to a heading): holds it still a few metres up until the ground and what stands on it are built under it, lowers it to a given height above whatever lies under it, lets it go, and answers once it has settled; refuses a point where it would reach another vessel |
 | `get_terrain` | the terrain of a body at a point: its height, whether the sea covers it, its slope and roughness |
 | `list_rocs` | the surface features of Breaking Ground near the active vessel: id, type, distance, where their pivot lies and its height above the terrain, their colliders, whether the vessel touches them |
-| `set_orbit` | puts the active vessel on an orbit, as *Set Orbit* of the `Alt+F12` menu does |
+| `set_orbit` | puts the active vessel on an orbit, as *Set Orbit* of the `Alt+F12` menu does, stopping the time warp first: a landed vessel the warp holds on rails would stay where it is set |
 | `revert_to_launch` | reverts the flight to its launch, as *Revert to Launch* does |
 | `revert_to_editor` | reverts the flight to the Vehicle Assembly Building or the Space Plane Hangar, as *Revert to* does |
 | `recover_vessel` | recovers the active vessel, as the *Recover* button does, and waits for the recovery report |
@@ -114,10 +114,11 @@ is closed.
 
 A drive stops, the rover braked, when it tips over, when it runs away at twice the speed asked, when the
 active vessel changes or when the flight ends.
-| `get_member`, `set_member` | reads or writes a field or property of a loaded object of any mod — a window's position, say; `get_member` also follows a path of fields, list indexes and components |
+| `get_member`, `set_member` | reads or writes a field or property of a loaded object of any mod — a window's position, say; `get_member` also follows a path of fields, list indexes and components, and reads several paths in the same frame |
+| `sample_members` | reads a list of members, of one object or several, at every rendered frame or every physics step, for a number of samples or seconds, and answers with a table, one row per sample; capped in rows and size |
 | `call_method` | calls a method of a loaded object of any mod, or a static one, with or without arguments |
 
-These three take the first loaded object of the type, or with `match` (`path=value`) the first one whose path reads that value.
+These four take the first loaded object of the type, or with `match` (`path=value`) the first one whose path reads that value.
 
 `mouse_move` and `mouse_click` take `x` and `y` in pixels of the game's window, counted from the top left
 corner of its client area (frame and title bar left out): `x` to the right, `y` down. Unity's
