@@ -22,8 +22,17 @@ namespace com.github.lhervier.ksp.util.mcpserver
         private const uint WM_LBUTTONUP = 0x0202;
         private const uint WM_RBUTTONDOWN = 0x0204;
         private const uint WM_RBUTTONUP = 0x0205;
+        private const uint WM_KEYDOWN = 0x0100;
+        private const uint WM_KEYUP = 0x0101;
+        private const uint WM_SYSKEYDOWN = 0x0104;
+        private const uint WM_SYSKEYUP = 0x0105;
         private const int MK_LBUTTON = 0x0001;
         private const int MK_RBUTTON = 0x0002;
+        private const int MK_SHIFT = 0x0004;
+        private const int MK_CONTROL = 0x0008;
+        private const int VK_SHIFT = 0x10;
+        private const int VK_CONTROL = 0x11;
+        private const int VK_MENU = 0x12;
 
         /// <summary>The window class of the Unity player's window.</summary>
         private const string UnityWindowClass = "UnityWndClass";
@@ -41,6 +50,30 @@ namespace com.github.lhervier.ksp.util.mcpserver
         {
             { "left", new Button(0, WM_LBUTTONDOWN, WM_LBUTTONUP, MK_LBUTTON) },
             { "right", new Button(1, WM_RBUTTONDOWN, WM_RBUTTONUP, MK_RBUTTON) }
+        };
+
+        /// <summary>The modifier keys a click can be made with, by Unity's key code.</summary>
+        private static readonly Dictionary<KeyCode, Key> Keys = new Dictionary<KeyCode, Key>
+        {
+            // Unity reads a posted Shift by the key of its side only, not by VK_SHIFT as a keyboard sends it; Ctrl
+            // and Alt by the key of either side, the extended flag telling the right one.
+            { KeyCode.LeftShift, new Key(KeyCode.LeftShift, VK_SHIFT, 0xA0, 0xA0, 0x2A, false, MK_SHIFT) },
+            { KeyCode.RightShift, new Key(KeyCode.RightShift, VK_SHIFT, 0xA1, 0xA1, 0x36, false, MK_SHIFT) },
+            { KeyCode.LeftControl, new Key(KeyCode.LeftControl, VK_CONTROL, 0xA2, VK_CONTROL, 0x1D, false, MK_CONTROL) },
+            { KeyCode.RightControl, new Key(KeyCode.RightControl, VK_CONTROL, 0xA3, VK_CONTROL, 0x1D, true, MK_CONTROL) },
+            { KeyCode.LeftAlt, new Key(KeyCode.LeftAlt, VK_MENU, 0xA4, VK_MENU, 0x38, false, 0) },
+            { KeyCode.RightAlt, new Key(KeyCode.RightAlt, VK_MENU, 0xA5, VK_MENU, 0x38, true, 0) }
+        };
+
+        /// <summary>The names the modifiers argument takes, but mod, which names the game's modifier key.</summary>
+        private static readonly Dictionary<string, KeyCode> KeyNames = new Dictionary<string, KeyCode>
+        {
+            { "shift", KeyCode.LeftShift },
+            { "right_shift", KeyCode.RightShift },
+            { "ctrl", KeyCode.LeftControl },
+            { "right_ctrl", KeyCode.RightControl },
+            { "alt", KeyCode.LeftAlt },
+            { "right_alt", KeyCode.RightAlt }
         };
 
         /// <summary>The input lock FlightDriver sets while the window of KSP does not have the focus.</summary>
@@ -67,12 +100,22 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 "Clicks at x, y as a mouse does: moves the pointer there as mouse_move does, then presses and releases " +
                 "the button, and answers once the game has seen both, with the pointer's position as Unity reads it " +
                 "and the interface objects under it. x and y as mouse_move takes them. The pointer stays there. With " +
-                "count 2, a double click: a second click right after the first, as a player's double click.",
+                "count 2, a double click: a second click right after the first, as a player's double click. With " +
+                "modifiers, the click is made with those keys held, as a keyboard holds them: pressed once the " +
+                "pointer is there, each seen held by Input.GetKey before the button goes down, released once it " +
+                "went up. They satisfy Input.GetKey of their KeyCode (LeftShift, RightShift, LeftControl, " +
+                "RightControl, LeftAlt, RightAlt), and so the key bindings of the game bound to them: " +
+                "GameSettings.MODIFIER_KEY (Left Alt or Right Alt by default) among them, which the inventories of " +
+                "the part action windows read to take a whole stack; mod names the key MODIFIER_KEY is bound to. " +
+                "Refused with modifiers while the game's window does not have the focus: the game then reads no key.",
                 Schema.Object(
                     Schema.P("x", "number", "pixels from the left edge of the game's window", true),
                     Schema.P("y", "number", "pixels from the top edge of the game's window", true),
                     Schema.P("button", "string", "left or right (default left)"),
-                    Schema.P("count", "number", "1 for a click, 2 for a double click (default 1)")),
+                    Schema.P("count", "number", "1 for a click, 2 for a double click (default 1)"),
+                    Schema.P("modifiers", "array",
+                        "keys held during the click: shift, ctrl, alt (the left ones), right_shift, right_ctrl, " +
+                        "right_alt, or mod, the game's modifier key (default none)")),
                 MouseClick);
         }
 
@@ -96,6 +139,18 @@ namespace com.github.lhervier.ksp.util.mcpserver
             Button button;
             if (!call.Choice("button", "left", Buttons, out button))
             {
+                yield break;
+            }
+            List<Key> keys;
+            if (!Modifiers(call, out keys))
+            {
+                yield break;
+            }
+            // Unity drops the key messages its window gets while it does not have the focus.
+            if (keys.Count > 0 && !Application.isFocused)
+            {
+                call.Fail("The game reads no key while its window does not have the focus: a click with modifiers " +
+                    "needs it");
                 yield break;
             }
             Target target;
@@ -123,12 +178,19 @@ namespace com.github.lhervier.ksp.util.mcpserver
             {
                 InputLockManager.RemoveControlLock(FocusLock);
             }
+            // The keys pressed so far, released whatever ends the click: a failure, or the call cancelled.
+            List<Key> held = new List<Key>();
             try
             {
-                yield return Press(call, target, button, count);
+                yield return HoldKeys(call, target, keys, held);
+                if (!call.IsError)
+                {
+                    yield return Press(call, target, button, count, ModifierFlags(keys));
+                }
             }
             finally
             {
+                ReleaseKeys(target, held);
                 if (focusLocked)
                 {
                     InputLockManager.SetControlLock(FocusLock);
@@ -138,17 +200,142 @@ namespace com.github.lhervier.ksp.util.mcpserver
             {
                 yield break;
             }
-            call.Text(Report(target, call.String("button", "left").ToLowerInvariant()));
+            yield return Waits.Until(call, () => keys.TrueForAll(k => !Input.GetKey(k.Code)), ButtonSeconds,
+                "The game did not see the modifier keys go up");
+            if (call.IsError)
+            {
+                yield break;
+            }
+            Dictionary<string, object> report = Report(target, call.String("button", "left").ToLowerInvariant());
+            if (keys.Count > 0)
+            {
+                report["modifiers"] = keys.ConvertAll(k => (object)k.Code.ToString());
+            }
+            call.Text(report);
         }
 
-        /// <summary>Presses and releases the button count times at the target, each time once the game has seen it.</summary>
-        private static IEnumerator Press(ToolCall call, Target target, Button button, int count)
+        /// <summary>
+        /// Reads the modifier keys the call names, each once, in its order. Returns false after failing the call
+        /// when one is unknown, or when mod names a key other than Shift, Ctrl or Alt.
+        /// </summary>
+        private static bool Modifiers(ToolCall call, out List<Key> keys)
+        {
+            keys = new List<Key>();
+            if (!call.Has("modifiers"))
+            {
+                return true;
+            }
+            // A single name is taken as a list of one.
+            object given = call.Arguments["modifiers"];
+            List<object> names = given as List<object> ?? new List<object> { given };
+            foreach (object item in names)
+            {
+                string name = Convert.ToString(item).ToLowerInvariant();
+                KeyCode code;
+                if (name == "mod")
+                {
+                    code = GameSettings.MODIFIER_KEY.primary.code;
+                    if (!Keys.ContainsKey(code))
+                    {
+                        call.Fail("mod: the game's modifier key is bound to " + code + ", not to Shift, Ctrl or Alt");
+                        return false;
+                    }
+                }
+                else if (!KeyNames.TryGetValue(name, out code))
+                {
+                    call.Fail("modifiers: shift, ctrl, alt, right_shift, right_ctrl, right_alt or mod, not " + name);
+                    return false;
+                }
+                if (!keys.Exists(k => k.Code == code))
+                {
+                    keys.Add(Keys[code]);
+                }
+            }
+            return true;
+        }
+
+        /// <summary>The flags of the mouse messages for the keys held: Shift and Ctrl only, as Windows has no other.</summary>
+        private static int ModifierFlags(List<Key> keys)
+        {
+            int flags = 0;
+            foreach (Key key in keys)
+            {
+                flags |= key.MouseFlag;
+            }
+            return flags;
+        }
+
+        /// <summary>
+        /// Presses the keys at the target's window, in order, adding each one to held as it goes down, and returns
+        /// once the game reads them all held. Fails the call when it does not after a while.
+        /// </summary>
+        private static IEnumerator HoldKeys(ToolCall call, Target target, List<Key> keys, List<Key> held)
+        {
+            foreach (Key key in keys)
+            {
+                held.Add(key);
+                PostKey(target, key, true, held);
+                yield return Waits.Until(call, () => Input.GetKey(key.Code), ButtonSeconds,
+                    "The game did not see " + key.Code + " go down");
+                if (call.IsError)
+                {
+                    yield break;
+                }
+            }
+        }
+
+        /// <summary>Releases the keys held, the last pressed first, and empties held; does not wait for the game.</summary>
+        private static void ReleaseKeys(Target target, List<Key> held)
+        {
+            for (int i = held.Count - 1; i >= 0; i--)
+            {
+                PostKey(target, held[i], false, held);
+                held.RemoveAt(i);
+            }
+        }
+
+        /// <summary>
+        /// Posts to the target's window the message of a key going down or up, as Windows sends a keyboard's,
+        /// and sets the key state of this thread to match. held: the keys held, this one included.
+        /// </summary>
+        private static void PostKey(Target target, Key key, bool down, List<Key> held)
+        {
+            // Windows sends the keys pressed and released while Alt is held, Alt itself included, as system keys,
+            // unless Ctrl is held too.
+            bool system = held.Exists(k => k.Vk == VK_MENU) && !held.Exists(k => k.Vk == VK_CONTROL);
+            uint message = down ? (system ? WM_SYSKEYDOWN : WM_KEYDOWN) : (system ? WM_SYSKEYUP : WM_KEYUP);
+            // lParam: a repeat count of 1, the scan code, the extended key flag, the context code (Alt held), then
+            // the previous state and the transition, both set for a key going up.
+            long flags = 1L | ((long)key.Scan << 16) | (key.Extended ? 1L << 24 : 0L) | (system ? 1L << 29 : 0L)
+                | (down ? 0L : (1L << 30) | (1L << 31));
+            // The key state of a thread, which GetKeyState reads, follows the keyboard's messages only, not posted
+            // ones: set by hand. The key of its side, then the key of either side, held while one of the two is.
+            byte[] state = new byte[256];
+            if (GetKeyboardState(state))
+            {
+                state[key.SideVk] = (byte)(down ? 0x80 : 0);
+                bool either = false;
+                foreach (Key other in Keys.Values)
+                {
+                    either |= other.Vk == key.Vk && (state[other.SideVk] & 0x80) != 0;
+                }
+                state[key.Vk] = (byte)(either ? 0x80 : 0);
+                SetKeyboardState(state);
+            }
+            PostMessage(target.Window, message, (IntPtr)key.MessageVk, (IntPtr)unchecked((int)flags));
+        }
+
+        /// <summary>
+        /// Presses and releases the button count times at the target, each time once the game has seen it.
+        /// modifierFlags: the flags of the modifier keys held, for the button's messages.
+        /// </summary>
+        private static IEnumerator Press(ToolCall call, Target target, Button button, int count, int modifierFlags)
         {
             for (int i = 0; i < count; i++)
             {
                 // The button goes down, then up once the game has seen it down for a frame: a press as short as a
                 // player's, which every handler of the game sees, whether it acts on the press or on the release.
-                Post(target, button.Down, (IntPtr)button.Flag);
+                Post(target, button.Down, (IntPtr)(button.Flag | modifierFlags));
                 yield return Waits.Until(call, () => Input.GetMouseButton(button.Index), ButtonSeconds,
                     "The game did not see the button go down");
                 if (call.IsError)
@@ -156,7 +343,7 @@ namespace com.github.lhervier.ksp.util.mcpserver
                     yield break;
                 }
                 yield return null;
-                Post(target, button.Up, IntPtr.Zero);
+                Post(target, button.Up, (IntPtr)modifierFlags);
                 yield return Waits.Until(call, () => !Input.GetMouseButton(button.Index), ButtonSeconds,
                     "The game did not see the button go up");
                 if (call.IsError)
@@ -371,6 +558,33 @@ namespace com.github.lhervier.ksp.util.mcpserver
             }
         }
 
+        /// <summary>
+        /// A modifier key: Unity's key code for it, the virtual key of either side and the one of its side, the
+        /// virtual key its messages carry, its scan code, whether it is an extended key, and its flag in the mouse
+        /// messages (0 if none).
+        /// </summary>
+        private struct Key
+        {
+            public readonly KeyCode Code;
+            public readonly int Vk;
+            public readonly int SideVk;
+            public readonly int MessageVk;
+            public readonly int Scan;
+            public readonly bool Extended;
+            public readonly int MouseFlag;
+
+            public Key(KeyCode code, int vk, int sideVk, int messageVk, int scan, bool extended, int mouseFlag)
+            {
+                Code = code;
+                Vk = vk;
+                SideVk = sideVk;
+                MessageVk = messageVk;
+                Scan = scan;
+                Extended = extended;
+                MouseFlag = mouseFlag;
+            }
+        }
+
         /// <summary>A point of the game's window, with the window and its size.</summary>
         private struct Target
         {
@@ -419,6 +633,12 @@ namespace com.github.lhervier.ksp.util.mcpserver
 
         [DllImport("user32.dll")]
         private static extern bool SetCursorPos(int x, int y);
+
+        [DllImport("user32.dll")]
+        private static extern bool GetKeyboardState(byte[] state);
+
+        [DllImport("user32.dll")]
+        private static extern bool SetKeyboardState(byte[] state);
 
         [DllImport("user32.dll")]
         private static extern bool PostMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);

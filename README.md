@@ -29,7 +29,7 @@ it: one message at a time, each tool's replacing the last, and never on a screen
 The tools that act on the game run one at a time: while one runs, another is refused at once, with the
 name of the one running. The tools that only read the game, and a few whose action gets in no one's way —
 `get_state`, `get_floating_origin`, `list_vessels`, `list_launch_sites`, `get_terrain`, `list_rocs`, `list_parts`, `read_part_menus`, `read_inventories`, `wait`, `screenshot`, `set_camera`, `aim_camera`,
-`set_ui`, `set_pause`, `set_cheats`, `stop_drive`, `quit_game`, `get_member`, `set_member`, `call_method`
+`set_ui`, `set_pause`, `set_cheats`, `set_focus_lock`, `stop_drive`, `quit_game`, `get_member`, `set_member`, `call_method`
 and the tools of other mods — run at any time: `get_state` answers while `drive_to` drives. A tool is
 stopped when its client cancels the call (`notifications/cancelled` of MCP), or after ten minutes; it
 then lets go of what it holds, the wheels of a rover say.
@@ -67,7 +67,8 @@ paints the ground of Kerbin with the wrong texture until the space centre has be
 | `map_view` | enters or leaves the map view of a flight, as the M key does, and answers once the game shows it; refuses when the game would ignore the key |
 | `iva_view` | enters the IVA view of the active vessel or leaves it for the flight view, as the C key does, and answers once the game shows it; refuses when the game would ignore the key, and when the vessel has no crew to look through |
 | `mouse_move` | moves the mouse pointer to a point of the game's window, as a mouse does, in any scene, with or without the focus, the Windows session locked or not; answers with the pointer as Unity reads it and the interface objects under it, each with the object a click on it reaches |
-| `mouse_click` | clicks the left or right button at a point of the game's window: moves the pointer there, presses and releases the button, and answers once the game has seen both, as `mouse_move` answers; or double-clicks, two clicks in a row as a player's |
+| `mouse_click` | clicks the left or right button at a point of the game's window: moves the pointer there, presses and releases the button, and answers once the game has seen both, as `mouse_move` answers; or double-clicks, two clicks in a row as a player's; with Shift, Ctrl or Alt held, or the game's modifier key |
+| `set_focus_lock` | keeps off, or lets the game set again, the lock it puts on every control while its window is out of focus, so that a script plays as in a window with the focus while the player works in another |
 | `read_tracking_station` | the tracking station as the player sees it: each row of its list from the top, with its vessel, whether it looks selected, where it lies on screen, and whether it lies within the visible part of the scrolled list; when another mod hides the station's list and shows its own rows instead, those rows (toggles of a toggle group labelled with a tracked vessel's name), `listReplaced`, and the station's own rows, hidden, with whether each is lit; the vessel selected; whether *Fly*, *Recover*, *Terminate* and *Track* show and respond, and where; points as `mouse_click` takes them |
 | `read_dialogs` | the dialogs open over the scene: name, title, message, and their buttons with their label, whether each responds, and the middle of each on screen, as `mouse_click` takes it |
 | `press_dialog_button` | presses a button of a dialog open over the scene, by its label, as a click does, in the dialog named or in any |
@@ -133,6 +134,27 @@ both tools tell it the window has the focus again, as a click on it would, and i
 loses the focus once more. `mouse_click` also lifts, for the click only, the lock the game puts on every
 control while its window is out of focus (`flightDriver_ApplicationFocus`), as `press_part_button` does: the
 EVA construction tools, among others, ignore a click while it holds.
+
+`mouse_click` takes `modifiers`, a list of keys held during the click: `shift`, `ctrl`, `alt` (the left
+keys), `right_shift`, `right_ctrl`, `right_alt`, or `mod`, the key the game's modifier key
+(`GameSettings.MODIFIER_KEY`, Left Alt by default) is bound to. Each key goes down once the pointer is there,
+as a keyboard's does, through the messages Windows sends the game's window for it (Shift by the key of its
+side, the only one Unity reads in a posted message); the click waits until
+`Input.GetKey` reads it held, and the key goes up once the button has. They satisfy `Input.GetKey` of their
+`KeyCode`, and so every key binding of the game bound to them: `MODIFIER_KEY` among them, which the inventories
+of the part action windows read to take a whole stack, or to fill a slot, at once. Unlike the clicks, the keys
+need the game's window to have the focus: Unity drops the key messages it gets without it, so `mouse_click`
+refuses `modifiers` then.
+
+**The window out of focus.** While its window does not have the focus, the game puts a lock on every control:
+`flightDriver_ApplicationFocus` in flight, `EditorDriver_AppFocus` in the editors, `ksc_ApplicationFocus` at
+the space centre, `applicationFocus` in the main menu. The part action windows then stop updating, resource
+transfers included, the staging turns purple, and the keys of the game do nothing. `set_focus_lock` with
+`ignore` true lifts that lock at once and keeps it off, every frame and in every scene, so that a long script
+plays as in a window with the focus while the player works in another; `ignore` false gives the game its own
+behaviour back, the lock set again if the window is out of focus. The switch is off when KSP starts, and is
+turned off with the server from the toolbar. `mouse_click` and `press_part_button` lift the lock for their
+click either way.
 
 Other mods can add their own tools, without depending on this one: see
 [Adding tools from another mod](#adding-tools-from-another-mod).

@@ -34,6 +34,7 @@ namespace com.github.lhervier.ksp.util.mcpserver
             tools.AddRange(TimeTools.All());
             tools.AddRange(ViewTools.All());
             tools.AddRange(MouseTools.All());
+            tools.AddRange(FocusTools.All());
             tools.AddRange(StationTools.All());
             tools.AddRange(FlightTools.All());
             tools.AddRange(PartMenuTools.All());
@@ -68,6 +69,8 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 StopListening(now: true);
                 StartListening();
             }
+            // Before the tools step, so that none of them meets a focus lock the switch keeps off.
+            FocusTools.Hold();
             MainThread.Pump();
         }
 
@@ -102,6 +105,8 @@ namespace com.github.lhervier.ksp.util.mcpserver
             else
             {
                 StopListening();
+                // The game behaves again as it does without this server.
+                FocusTools.SetIgnored(false);
                 text = "KSP-Util-MCPServer off";
             }
             ScreenMessages.PostScreenMessage(text, SwitchMessageDuration, ScreenMessageStyle.UPPER_CENTER);
