@@ -196,10 +196,11 @@ namespace com.github.lhervier.ksp.util.mcpserver
         }
 
         /// <summary>
-        /// Where a row lies on screen, as <see cref="ScreenRect"/> gives it, and whether its middle lies within the
-        /// visible part of the scrolled list that holds it (always true outside a scrolled list).
+        /// Where a row, or any element of a list, lies on screen, as <see cref="ScreenRect"/> gives it, and whether
+        /// its middle lies within the visible part of the scrolled list that holds it (always true outside a
+        /// scrolled list).
         /// </summary>
-        private static Dictionary<string, object> RowPlace(RectTransform rect)
+        internal static Dictionary<string, object> RowPlace(RectTransform rect)
         {
             Dictionary<string, object> place = ScreenRect(rect);
             bool inView = true;
@@ -328,7 +329,7 @@ namespace com.github.lhervier.ksp.util.mcpserver
         /// Where an interface element lies on screen, in pixels of the game's window from its top left corner, y
         /// down: its middle (x, y), its left and top edges, its width and height.
         /// </summary>
-        private static Dictionary<string, object> ScreenRect(RectTransform rect)
+        internal static Dictionary<string, object> ScreenRect(RectTransform rect)
         {
             Canvas canvas = rect.GetComponentInParent<Canvas>();
             Camera camera = null;

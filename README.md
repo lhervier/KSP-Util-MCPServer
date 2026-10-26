@@ -28,7 +28,7 @@ it: one message at a time, each tool's replacing the last, and never on a screen
 
 The tools that act on the game run one at a time: while one runs, another is refused at once, with the
 name of the one running. The tools that only read the game, and a few whose action gets in no one's way —
-`get_state`, `get_floating_origin`, `list_vessels`, `list_launch_sites`, `get_terrain`, `list_rocs`, `list_parts`, `read_part_menus`, `wait`, `screenshot`, `set_camera`, `aim_camera`,
+`get_state`, `get_floating_origin`, `list_vessels`, `list_launch_sites`, `get_terrain`, `list_rocs`, `list_parts`, `read_part_menus`, `read_inventories`, `wait`, `screenshot`, `set_camera`, `aim_camera`,
 `set_ui`, `set_pause`, `set_cheats`, `stop_drive`, `quit_game`, `get_member`, `set_member`, `call_method`
 and the tools of other mods — run at any time: `get_state` answers while `drive_to` drives. A tool is
 stopped when its client cancels the call (`notifications/cancelled` of MCP), or after ten minutes; it
@@ -98,6 +98,7 @@ paints the ground of Kerbin with the wrong texture until the space centre has be
 | `part_menu` | opens a part's action window as a right click on it does (the windows not pinned close), pins or unpins it, drags it to a point of the screen by its title bar, or closes every window not pinned as a right click on empty space does |
 | `read_part_menus` | the open part action windows, where they are on screen and what they show: buttons, fields, resources, and the resource transfer controls with their buttons, state and links to the other parts' |
 | `press_part_button` | presses a button of a part's action window, by its label or the name of its event (the same in every language of the game), or the In, Out or Stop button of a resource transfer |
+| `read_inventories` | the inventories shown, in the part action windows, the panel of EVA construction or cargo, or the editors' inventory panel: each one's part or kerbal, whether its group of a part action window is collapsed, its volume and mass (stored, shown by its footer, limit, limit reached), and its slots with their part, variant, quantity and stack capacity, and the middle of each on screen, as `mouse_click` takes it; and the part held by the mouse: its name, the size of the stack held, the inventory it came from, the slot clicked and the slot the game marks as emptied |
 | `locate_part` | where a part is on screen: the rectangle its colliders cover, how much of it shows, and a point where the mouse is over it, found by casting rays as the game does to find the part under the mouse; its colliders and how many are triggers, and how far it leans from the vertical; with `find_view`, first turns the camera to where the most of it shows |
 | `aim_camera` | aims the camera at a part, as the *Aim Camera* button of its action window does, or back at the active vessel, as *Reset Camera* does |
 | `construction_tool` | opens or closes the construction panel of EVA construction, as its toolbar button does, and picks its Place, Move or Rotate tool, as its buttons do; answers with the tool in use and the part selected |
