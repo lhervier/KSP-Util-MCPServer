@@ -27,6 +27,11 @@ What is left to do on KSP-Util-MCPServer, most urgent first.
   a second, then lowers it to a few centimetres and lets it go; a capsule on a tank jumped from the KSC to
   72° N unharmed. Still to try: near Kourou in Real Solar System, and the rover of 18 parts that crashed
   twice at the Desert Airfield.
+- **`set_position` and the other kerbal on EVA**: a kerbal on EVA left alone came off rails, after the move,
+  where its old place in the scene lies, next to the kerbal moved; `set_position` now puts the other loaded
+  vessels back where they stood. The cause in the game is not found: find it, so the put-back can go. Once,
+  right after KSP started, the tool never answered that the kerbal moved had settled (60 s), though it stood
+  still: not seen again.
 - **EVA and EVA construction tools**, so that a protocol that places parts no longer needs a player's
   hands (anchors on a static, for Terrain Precision Fix): `eva` (a kerbal out of a crewed part, by
   `FlightEVA.spawnEVA`: public, simple); placing a part from a kerbal's inventory on the ground (the

@@ -47,8 +47,10 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 "game builds no terrain, and stops the time warp. It holds the vessel a few metres up, " +
                 "still, until the ground and what stands on it are built under it, lowers it to the given height " +
                 "above whatever lies under it (the ground, a rock, a building), lets it go, and answers once it is " +
-                "landed (or splashed) and still, or after the time limit. Refuses a point where it would reach " +
-                "another vessel (50 m from one that is not loaded).",
+                "landed (or splashed) and still, or after the time limit. The other loaded vessels, which the game " +
+                "puts on rails for the move, are put back where they stood if they come off rails elsewhere (a " +
+                "kerbal on EVA does). Refuses a point where it would reach another vessel (50 m from one that is " +
+                "not loaded).",
                 Schema.Object(
                     Schema.P("body", "string", "the body's name (default: the vessel's)"),
                     Schema.P("latitude", "number", "degrees", true),
@@ -345,130 +347,146 @@ namespace com.github.lhervier.ksp.util.mcpserver
             double rootAltitude = terrain + reach + Math.Max(HoldClearance, release);
             // What lies under the held vessel is nearer than this, or the ground is not built yet under it.
             double farthest = reach + Math.Max(HoldClearance, release) + 10.0;
-            // As the menu does it, but without its ease to the ground: the game loses the lighter gravity of that
-            // ease when the vessel goes off rails while keeping it flagged.
-            FlightGlobals.fetch.SetVesselPosition(body, lat, lon, rootAltitude - terrain, 0.0, 0.0, true, false);
-            FloatingOrigin.ResetTerrainShaderOffset();
-            Hold(placed, target, lat, lon, rootAltitude, attitude);
-
-            // Held still until what lies under it reads the same for a second, the vessel off rails.
-            float holdStart = Time.realtimeSinceStartup;
-            double clearance = double.PositiveInfinity;
-            int steady = 0;
-            while (true)
+            // The other loaded vessels, where they stand now. The game puts them on rails for the move, and a kerbal
+            // on EVA has been seen coming off rails again where its old place in the scene lies once the scene follows
+            // the vessel moved: next to it (2026-10-27, cause not found). Each is put back if so.
+            List<Stay> stays = Stays(placed);
+            EventData<Vessel>.OnEvent restore = v => KeepInPlace(stays);
+            GameEvents.onVesselGoOffRails.Add(restore);
+            try
             {
-                yield return new WaitForFixedUpdate();
-                if (FlightGlobals.ActiveVessel != placed || placed.state == Vessel.State.DEAD)
-                {
-                    call.Fail("The vessel was destroyed while it was held above the ground");
-                    yield break;
-                }
-                if (Time.realtimeSinceStartup - holdStart > HoldLimit)
-                {
-                    call.Fail("Nothing under the vessel read the same for a second after " + HoldLimit + " s (" +
-                        (double.IsInfinity(clearance) ? "nothing found under it" : clearance.ToString("F3") + " m under it") +
-                        "): it is let go where it is held, and falls");
-                    yield break;
-                }
-                if (placed.packed)
-                {
-                    // On rails, the game keeps it where it was set.
-                    continue;
-                }
+                // As the menu does it, but without its ease to the ground: the game loses the lighter gravity of that
+                // ease when the vessel goes off rails while keeping it flagged.
+                FlightGlobals.fetch.SetVesselPosition(body, lat, lon, rootAltitude - terrain, 0.0, 0.0, true, false);
+                FloatingOrigin.ResetTerrainShaderOffset();
                 Hold(placed, target, lat, lon, rootAltitude, attitude);
-                Collider under;
-                double reading = Clearance(placed, target, overSea, rootAltitude + reach + 100.0, out under);
-                // A quad of the terrain below the finest level is still to be split, and its finer quads will not
-                // stand at the same height.
-                PQ quad = under != null ? under.GetComponent<PQ>() : null;
-                if (reading > farthest || (quad != null && quad.subdivision < quad.sphereRoot.maxLevel))
-                {
-                    reading = double.PositiveInfinity;
-                }
-                steady = !double.IsInfinity(reading) && Math.Abs(reading - clearance) < 0.001 ? steady + 1 : 0;
-                if (steady == 0 && !double.IsInfinity(reading))
-                {
-                    Log.Info("set_position: " + reading.ToString("F4") + " m above " + Describe(under, quad));
-                }
-                clearance = reading;
-                if (steady >= SteadySteps)
-                {
-                    Log.Info("set_position: held " + (Time.realtimeSinceStartup - holdStart).ToString("F1") + " s, " +
-                        clearance.ToString("F4") + " m above " + Describe(under, quad));
-                    break;
-                }
-            }
 
-            // Lowered to the height asked above what was found, held there a few steps, read again, then let go.
-            for (int pass = 0; pass < 3 && Math.Abs(clearance - release) > 0.002; pass++)
-            {
-                rootAltitude -= clearance - release;
-                for (int i = 0; i < 5; i++)
+                // Held still until what lies under it reads the same for a second, the vessel off rails.
+                float holdStart = Time.realtimeSinceStartup;
+                double clearance = double.PositiveInfinity;
+                int steady = 0;
+                while (true)
                 {
-                    Hold(placed, target, lat, lon, rootAltitude, attitude);
                     yield return new WaitForFixedUpdate();
                     if (FlightGlobals.ActiveVessel != placed || placed.state == Vessel.State.DEAD)
                     {
-                        call.Fail("The vessel was destroyed while it was lowered");
+                        call.Fail("The vessel was destroyed while it was held above the ground");
+                        yield break;
+                    }
+                    if (Time.realtimeSinceStartup - holdStart > HoldLimit)
+                    {
+                        call.Fail("Nothing under the vessel read the same for a second after " + HoldLimit + " s (" +
+                            (double.IsInfinity(clearance) ? "nothing found under it" : clearance.ToString("F3") + " m under it") +
+                            "): it is let go where it is held, and falls");
+                        yield break;
+                    }
+                    if (placed.packed)
+                    {
+                        // On rails, the game keeps it where it was set.
+                        continue;
+                    }
+                    Hold(placed, target, lat, lon, rootAltitude, attitude);
+                    Collider under;
+                    double reading = Clearance(placed, target, overSea, rootAltitude + reach + 100.0, out under);
+                    // A quad of the terrain below the finest level is still to be split, and its finer quads will not
+                    // stand at the same height.
+                    PQ quad = under != null ? under.GetComponent<PQ>() : null;
+                    if (reading > farthest || (quad != null && quad.subdivision < quad.sphereRoot.maxLevel))
+                    {
+                        reading = double.PositiveInfinity;
+                    }
+                    steady = !double.IsInfinity(reading) && Math.Abs(reading - clearance) < 0.001 ? steady + 1 : 0;
+                    if (steady == 0 && !double.IsInfinity(reading))
+                    {
+                        Log.Info("set_position: " + reading.ToString("F4") + " m above " + Describe(under, quad));
+                    }
+                    clearance = reading;
+                    if (steady >= SteadySteps)
+                    {
+                        Log.Info("set_position: held " + (Time.realtimeSinceStartup - holdStart).ToString("F1") + " s, " +
+                            clearance.ToString("F4") + " m above " + Describe(under, quad));
+                        break;
+                    }
+                }
+
+                // Lowered to the height asked above what was found, held there a few steps, read again, then let go.
+                for (int pass = 0; pass < 3 && Math.Abs(clearance - release) > 0.002; pass++)
+                {
+                    rootAltitude -= clearance - release;
+                    for (int i = 0; i < 5; i++)
+                    {
+                        Hold(placed, target, lat, lon, rootAltitude, attitude);
+                        yield return new WaitForFixedUpdate();
+                        if (FlightGlobals.ActiveVessel != placed || placed.state == Vessel.State.DEAD)
+                        {
+                            call.Fail("The vessel was destroyed while it was lowered");
+                            yield break;
+                        }
+                    }
+                    Hold(placed, target, lat, lon, rootAltitude, attitude);
+                    Collider under;
+                    clearance = Clearance(placed, target, overSea, rootAltitude + reach + 100.0, out under);
+                    Log.Info("set_position: lowered, " + clearance.ToString("F4") + " m above " +
+                        Describe(under, under != null ? under.GetComponent<PQ>() : null));
+                    if (double.IsInfinity(clearance))
+                    {
+                        call.Fail("Nothing was found under the vessel once lowered: it is let go where it is held");
                         yield break;
                     }
                 }
                 Hold(placed, target, lat, lon, rootAltitude, attitude);
-                Collider under;
-                clearance = Clearance(placed, target, overSea, rootAltitude + reach + 100.0, out under);
-                Log.Info("set_position: lowered, " + clearance.ToString("F4") + " m above " +
-                    Describe(under, under != null ? under.GetComponent<PQ>() : null));
-                if (double.IsInfinity(clearance))
-                {
-                    call.Fail("Nothing was found under the vessel once lowered: it is let go where it is held");
-                    yield break;
-                }
-            }
-            Hold(placed, target, lat, lon, rootAltitude, attitude);
-            Log.Info("set_position: let go");
+                Log.Info("set_position: let go");
 
-            // Settled: on the ground, and still for two seconds in a row.
-            float start = Time.realtimeSinceStartup;
-            float stillSince = -1f;
-            float limit = (float)call.Number("timeout", 60.0);
-            float logged = -1f;
-            while (Time.realtimeSinceStartup - start < limit)
-            {
-                yield return null;
-                Vessel vessel = FlightGlobals.ActiveVessel;
-                if (vessel == placed && Time.realtimeSinceStartup - logged >= 0.5f)
+                // Settled: on the ground, and still for two seconds in a row.
+                float start = Time.realtimeSinceStartup;
+                float stillSince = -1f;
+                float limit = (float)call.Number("timeout", 60.0);
+                float logged = -1f;
+                while (Time.realtimeSinceStartup - start < limit)
                 {
-                    logged = Time.realtimeSinceStartup;
-                    Log.Info("set_position: " + vessel.situation + ", " + vessel.srfSpeed.ToString("F3") + " m/s, " +
-                        vessel.heightFromTerrain.ToString("F3") + " m above the terrain");
-                }
-                // A vessel that broke on landing is no longer the active one, or is dead.
-                if (vessel != placed || vessel.state == Vessel.State.DEAD)
-                {
-                    call.Fail("The vessel was destroyed while it was put down");
-                    yield break;
-                }
-                bool down = !vessel.packed
-                    && (vessel.situation == Vessel.Situations.LANDED || vessel.situation == Vessel.Situations.SPLASHED
-                        || vessel.situation == Vessel.Situations.PRELAUNCH);
-                if (down && vessel.srfSpeed < 0.01)
-                {
-                    if (stillSince < 0f)
+                    yield return null;
+                    KeepInPlace(stays);
+                    Vessel vessel = FlightGlobals.ActiveVessel;
+                    if (vessel == placed && Time.realtimeSinceStartup - logged >= 0.5f)
                     {
-                        stillSince = Time.realtimeSinceStartup;
+                        logged = Time.realtimeSinceStartup;
+                        Log.Info("set_position: " + vessel.situation + ", " + vessel.srfSpeed.ToString("F3") + " m/s, " +
+                            vessel.heightFromTerrain.ToString("F3") + " m above the terrain");
                     }
-                    else if (Time.realtimeSinceStartup - stillSince >= 2f)
+                    // A vessel that broke on landing is no longer the active one, or is dead.
+                    if (vessel != placed || vessel.state == Vessel.State.DEAD)
                     {
-                        call.Text(GameState.State());
+                        call.Fail("The vessel was destroyed while it was put down");
                         yield break;
                     }
+                    bool down = !vessel.packed
+                        && (vessel.situation == Vessel.Situations.LANDED || vessel.situation == Vessel.Situations.SPLASHED
+                            || vessel.situation == Vessel.Situations.PRELAUNCH);
+                    if (down && vessel.srfSpeed < 0.01)
+                    {
+                        if (stillSince < 0f)
+                        {
+                            stillSince = Time.realtimeSinceStartup;
+                        }
+                        // The other vessels checked off rails too, or given up on once off rails is long to come.
+                        else if (Time.realtimeSinceStartup - stillSince >= 2f
+                            && (stays.All(stay => stay.Done) || Time.realtimeSinceStartup - start >= StayLimit))
+                        {
+                            call.Text(GameState.State());
+                            yield break;
+                        }
+                    }
+                    else
+                    {
+                        stillSince = -1f;
+                    }
                 }
-                else
-                {
-                    stillSince = -1f;
-                }
+                call.Fail("The vessel had not settled after " + limit + " s: " + Json.Write(GameState.State()));
             }
-            call.Fail("The vessel had not settled after " + limit + " s: " + Json.Write(GameState.State()));
+            finally
+            {
+                GameEvents.onVesselGoOffRails.Remove(restore);
+            }
         }
 
         // set_position: metres between the lowest point of the vessel and the terrain while it is held, how long it
@@ -476,6 +494,89 @@ namespace com.github.lhervier.ksp.util.mcpserver
         private const double HoldClearance = 2.0;
         private const float HoldLimit = 30f;
         private const int SteadySteps = 50;
+
+        // set_position: metres a vessel left alone may be found off where it stood once off rails, how many checks
+        // off rails it gets, and how many seconds after it is let go the vessel moved waits for the others to come off.
+        private const double StayTolerance = 0.3;
+        private const int StayChecks = 5;
+        private const float StayLimit = 10f;
+
+        /// <summary>Where a loaded vessel other than the one set_position moves stood before the move, and whether
+        /// it is known to have come off rails there.</summary>
+        private sealed class Stay
+        {
+            public Vessel Vessel;
+            public double Latitude;
+            public double Longitude;
+            public double Altitude;
+            public Quaternion Attitude;
+            public int Checks;
+            public bool Done;
+        }
+
+        /// <summary>The loaded vessels other than <paramref name="placed"/>, with where they stand now.</summary>
+        private static List<Stay> Stays(Vessel placed)
+        {
+            List<Stay> stays = new List<Stay>();
+            foreach (Vessel vessel in FlightGlobals.VesselsLoaded)
+            {
+                if (vessel == null || vessel == placed || vessel.state == Vessel.State.DEAD)
+                {
+                    continue;
+                }
+                CelestialBody body = vessel.mainBody;
+                Vector3d position = vessel.vesselTransform.position;
+                double latitude = body.GetLatitude(position);
+                double longitude = body.GetLongitude(position);
+                double altitude = body.GetAltitude(position);
+                stays.Add(new Stay
+                {
+                    Vessel = vessel,
+                    Latitude = latitude,
+                    Longitude = longitude,
+                    Altitude = altitude,
+                    Attitude = Quaternion.Inverse(Geo.LocalFrame(body, latitude, longitude, altitude))
+                        * vessel.vesselTransform.rotation
+                });
+            }
+            return stays;
+        }
+
+        /// <summary>
+        /// Puts back where it stood, still, each vessel of <paramref name="stays"/> found elsewhere during its first
+        /// checks off rails. To be called when a vessel comes off rails, and at every frame.
+        /// </summary>
+        private static void KeepInPlace(List<Stay> stays)
+        {
+            foreach (Stay stay in stays)
+            {
+                Vessel vessel = stay.Vessel;
+                if (stay.Done)
+                {
+                    continue;
+                }
+                if (vessel == null || vessel.state == Vessel.State.DEAD || !vessel.loaded)
+                {
+                    stay.Done = true;
+                    continue;
+                }
+                if (vessel.packed)
+                {
+                    continue;
+                }
+                CelestialBody body = vessel.mainBody;
+                Vector3d spot = body.GetWorldSurfacePosition(stay.Latitude, stay.Longitude, stay.Altitude);
+                double off = Vector3d.Distance(vessel.vesselTransform.position, spot);
+                if (off > StayTolerance)
+                {
+                    Log.Info("set_position: " + vessel.vesselName + " came off rails " + off.ToString("F2") +
+                        " m from where it stood, put back");
+                    Hold(vessel, body, stay.Latitude, stay.Longitude, stay.Altitude, stay.Attitude);
+                }
+                stay.Checks++;
+                stay.Done = stay.Checks >= StayChecks;
+            }
+        }
 
         /// <summary>
         /// Puts the vessel at a root altitude above a point of a body, in an attitude against the local horizon,
