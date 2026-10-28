@@ -17,16 +17,26 @@ namespace com.github.lhervier.ksp.util.mcpserver
             { "SANDBOX", Game.Modes.SANDBOX }
         };
 
+        // What load_save waits for, by the name its argument gives: true when a vessel on rails will do.
+        private static readonly Dictionary<string, bool> LoadWaits = new Dictionary<string, bool>
+        {
+            { "physics", false },
+            { "loaded", true }
+        };
+
         public static IEnumerable<Tool> All()
         {
             yield return new Tool("load_save",
                 "Loads a save into flight, as the quickload does, from the space centre or from flight only (the " +
                 "scenarios of the mods installed since are added), and waits until the active vessel is unpacked and " +
-                "physics runs on it. Refused anywhere else, the main menu included: open the game first with " +
-                "open_game, which goes to the space centre, as a player does.",
+                "physics runs on it, or, with wait set to loaded, only until it is loaded, on rails or not: for a " +
+                "vessel that something keeps on rails. Refused anywhere else, the main menu included: open the game " +
+                "first with open_game, which goes to the space centre, as a player does.",
                 Schema.Object(
                     Schema.P("folder", "string", "the game's folder under saves/ (default: the game being played)"),
-                    Schema.P("save", "string", "the save's name, without .sfs", true)),
+                    Schema.P("save", "string", "the save's name, without .sfs", true),
+                    Schema.P("wait", "string", "physics (the default): until physics runs on the active vessel; " +
+                        "loaded: until it is loaded, on rails or not")),
                 LoadSave);
             yield return new Tool("open_game",
                 "Opens a game's persistent save, from any scene, the main menu included, as Resume Game does, and " +
@@ -102,6 +112,11 @@ namespace com.github.lhervier.ksp.util.mcpserver
             }
             string folder = call.String("folder", HighLogic.SaveFolder);
             string save = call.String("save");
+            bool onRailsToo;
+            if (!call.Choice("wait", "physics", LoadWaits, out onRailsToo))
+            {
+                yield break;
+            }
             // LoadGame also clears the dictionaries of persistent ids, which are internal; the file is read again
             // for onGameStatePostLoad, which wants its node.
             Game game = GamePersistence.LoadGame(save, folder, true, false);
@@ -120,7 +135,7 @@ namespace com.github.lhervier.ksp.util.mcpserver
             HighLogic.CurrentGame = game;
             GameEvents.onGameStatePostLoad.Fire(node);
             FlightDriver.StartAndFocusVessel(game, game.flightState.activeVesselIdx);
-            yield return Waits.ForNewActiveVessel(call, previous);
+            yield return Waits.ForNewActiveVessel(call, previous, null, onRailsToo);
         }
 
         private static IEnumerator OpenGame(ToolCall call)

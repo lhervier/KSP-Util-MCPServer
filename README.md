@@ -22,7 +22,8 @@ request asks it to.
 ## What it offers
 
 Every tool runs on the game's main thread and answers once it is done: `drive_to` answers when the rover
-is parked, `load_save` when the vessel is in flight and physics runs on it. While it runs, a short message
+is parked, `load_save` when the vessel is in flight and physics runs on it (or, with `wait: loaded`, as soon as
+it is loaded, for a vessel that a mod keeps on rails). While it runs, a short message
 at the top of the screen names it, with its arguments, so that whoever watches the game sees what drives
 it: one message at a time, each tool's replacing the last, and never on a screenshot.
 

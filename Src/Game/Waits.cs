@@ -86,11 +86,13 @@ namespace com.github.lhervier.ksp.util.mcpserver
 
         /// <summary>
         /// Waits until a flight scene is up with an active vessel other than <paramref name="previous"/>, the
-        /// one whose id is <paramref name="id"/> when it is given, and physics runs on it; then answers with the
-        /// state of the game. Fails as soon as KSP gives up the flight for another scene, or after three minutes.
-        /// To be yielded right after the flight is asked for.
+        /// one whose id is <paramref name="id"/> when it is given, and physics runs on it, or, when
+        /// <paramref name="onRailsToo"/>, as soon as it is loaded, on rails or not; then answers with the state of
+        /// the game. Fails as soon as KSP gives up the flight for another scene, or after three minutes. To be
+        /// yielded right after the flight is asked for.
         /// </summary>
-        public static IEnumerator ForNewActiveVessel(ToolCall call, Vessel previous, Guid? id = null)
+        public static IEnumerator ForNewActiveVessel(ToolCall call, Vessel previous, Guid? id = null,
+            bool onRailsToo = false)
         {
             // KSP asks for the flight scene when the tool asks it to, before this starts: any scene asked for
             // from now on means it gave the flight up, as it does when a launch site cannot be found.
@@ -101,7 +103,8 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 // vessel destroyed with its scene compares equal to null, and so differs from the new one.
                 float start = Time.realtimeSinceStartup;
                 while (!(HighLogic.LoadedSceneIsFlight && FlightGlobals.ready && FlightGlobals.ActiveVessel != null
-                         && FlightGlobals.ActiveVessel != previous && !FlightGlobals.ActiveVessel.packed
+                         && FlightGlobals.ActiveVessel != previous
+                         && (onRailsToo ? FlightGlobals.ActiveVessel.loaded : !FlightGlobals.ActiveVessel.packed)
                          && (id == null || FlightGlobals.ActiveVessel.id == id.Value)))
                 {
                     if (request.Requested && request.Scene != GameScenes.FLIGHT)
