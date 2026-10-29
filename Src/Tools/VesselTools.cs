@@ -36,6 +36,13 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 Schema.Object(
                     Schema.P("kerbal", "string", "the crew member's name (default: the first one aboard)")),
                 GoEva);
+            yield return new Tool("let_go_ladder",
+                "Makes the kerbal on EVA being flown let go of the ladder it holds, as the jump key (Space) does on " +
+                "a ladder, and waits until it is off the ladder and still, on the ground or wherever it lands. " +
+                "A kerbal on a ladder keeps the game from switching to another vessel.",
+                Schema.Object(
+                    Schema.P("timeout", "number", "seconds to wait for the kerbal to come to rest (default 15)")),
+                LetGoLadder);
             yield return new Tool("set_cheats",
                 "Turns on or off the cheats of the Cheats tab of the Alt+F12 menu given; those left out are kept. " +
                 "Answers with the state of them all.",
@@ -209,6 +216,36 @@ namespace com.github.lhervier.ksp.util.mcpserver
                     && FlightGlobals.ActiveVessel.isEVA && FlightGlobals.ActiveVessel.vesselName == crew.name
                     && !FlightGlobals.ActiveVessel.packed,
                 60f, crew.name + " was not the active vessel a minute after leaving");
+            if (!call.IsError)
+            {
+                call.Text(GameState.State());
+            }
+        }
+
+        private static IEnumerator LetGoLadder(ToolCall call)
+        {
+            if (!Require.Flight(call))
+            {
+                yield break;
+            }
+            Vessel vessel = FlightGlobals.ActiveVessel;
+            KerbalEVA eva = vessel.isEVA ? vessel.evaController : null;
+            if (eva == null)
+            {
+                call.Fail(vessel.vesselName + " is not a kerbal on EVA");
+                yield break;
+            }
+            if (!eva.OnALadder)
+            {
+                call.Fail(vessel.vesselName + " is not on a ladder");
+                yield break;
+            }
+            // The event the jump key fires on a ladder (KerbalEVA.On_ladderLetGo), run without its check of the key,
+            // as KerbalEVA does itself when the kerbal goes on rails (OnVesselGoOnRails).
+            eva.fsm.RunEvent(eva.On_ladderLetGo);
+            float timeout = (float)call.Number("timeout", 15);
+            yield return Waits.Until(call, () => !eva.OnALadder && vessel.srfSpeed < 0.05,
+                timeout, vessel.vesselName + " was not still " + timeout + " s after letting go");
             if (!call.IsError)
             {
                 call.Text(GameState.State());

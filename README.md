@@ -62,6 +62,7 @@ paints the ground of Kerbin with the wrong texture until the space centre has be
 | `switch_vessel` | makes a vessel the active one: a loaded one as the switch vessel keys `[` and `]` do, one far away as *Switch To* of the map view does |
 | `set_target` | sets the active vessel's target to another vessel, or clears it; refuses while targeting is locked, as it is in EVA construction mode, but not because the window of KSP is out of focus |
 | `go_eva` | sends a crew member of the active vessel out on EVA, as the EVA button of the crew portrait does, and answers once the kerbal is the active vessel |
+| `let_go_ladder` | makes the kerbal on EVA being flown let go of its ladder, as the jump key does on a ladder, and answers once it is still; a kerbal on a ladder keeps the game from switching vessels |
 | `screenshot` | captures the screen, interface included but not the message of this mod; returns the image and saves it as a PNG |
 | `set_camera` | the flight camera's distance, heading and pitch, its field of view, and where it aims, as the middle mouse button does |
 | `set_ui` | hides or shows the game's interface in flight, as F2 does |
