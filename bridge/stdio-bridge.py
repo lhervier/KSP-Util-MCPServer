@@ -93,9 +93,10 @@ class KspServer:
 def ksp_running():
     """Tells whether a KSP process runs on this computer, from whatever folder."""
     if os.name == "nt":
-        out = subprocess.run(["tasklist", "/FI", "IMAGENAME eq KSP_x64.exe"], capture_output=True, text=True,
+        # Bytes, not text: a localized tasklist writes in the OEM code page, which text mode may fail to decode.
+        out = subprocess.run(["tasklist", "/FI", "IMAGENAME eq KSP_x64.exe"], capture_output=True,
                              creationflags=subprocess.CREATE_NO_WINDOW).stdout
-        return "KSP_x64.exe" in out
+        return b"KSP_x64.exe" in out
     return subprocess.run(["pgrep", "-f", "KSP.x86_64|KSP.app/Contents/MacOS/KSP"],
                           capture_output=True).returncode == 0
 

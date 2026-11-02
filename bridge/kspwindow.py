@@ -22,8 +22,9 @@ DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 = -4
 
 def place_window(pid, x, timeout=WINDOW_TIMEOUT):
     """Moves the window of process pid so that its visible left edge is x pixels right of the left edge of the
-    work area of the primary screen, keeping its vertical position and its size. A full-screen window is left
-    where it is. Waits up to timeout seconds for the window to show. Never raises: returns one line telling what
+    work area of the primary screen, keeping its vertical position and its size. A window still full screen
+    after timeout seconds is left where it is. Waits up to timeout seconds for the window to show and leave full
+    screen. Never raises: returns one line telling what
     was done, or why nothing was."""
     if os.name != "nt":
         return "window not moved: only done on Windows"
@@ -106,15 +107,25 @@ def _place(pid, x, timeout):
         time.sleep(POLL_PERIOD)
         hwnd = find()
 
+    def full_screen():
+        monitor = MONITORINFO()
+        monitor.cbSize = ctypes.sizeof(MONITORINFO)
+        if not user32.GetMonitorInfoW(user32.MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST),
+                                      ctypes.byref(monitor)):
+            raise ctypes.WinError(ctypes.get_last_error())
+        screen = monitor.rcMonitor
+        return frame.left <= screen.left and frame.top <= screen.top and frame.right >= screen.right \
+            and frame.bottom >= screen.bottom
+
+    # Unity opens the window with the screen mode of its registry preferences, which every KSP install of the
+    # user shares, and KSP applies the one of its settings.cfg only later: a window full screen at first may
+    # still turn into a window.
     rect, frame = bounds(hwnd)
-    monitor = MONITORINFO()
-    monitor.cbSize = ctypes.sizeof(MONITORINFO)
-    if not user32.GetMonitorInfoW(user32.MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST), ctypes.byref(monitor)):
-        raise ctypes.WinError(ctypes.get_last_error())
-    screen = monitor.rcMonitor
-    if frame.left <= screen.left and frame.top <= screen.top and frame.right >= screen.right \
-            and frame.bottom >= screen.bottom:
-        return "window not moved: full screen"
+    while full_screen():
+        if time.time() - began > timeout:
+            return "window not moved: full screen"
+        time.sleep(POLL_PERIOD)
+        rect, frame = bounds(hwnd)
 
     work = wintypes.RECT()
     if not user32.SystemParametersInfoW(SPI_GETWORKAREA, 0, ctypes.byref(work), 0):
