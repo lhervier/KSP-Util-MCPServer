@@ -65,6 +65,30 @@ namespace com.github.lhervier.ksp.util.mcpserver
                     Schema.P("resource", "string", "the resource of a transfer control, by name (LiquidFuel, Oxidizer...)"),
                     Schema.P("transfer", "string", "in, out or stop: the transfer control's button to press")),
                 PressPartButton);
+            yield return new Tool("set_part_menu_value",
+                "Sets a slider of a part's open part action window to a number, as typing it in the slider's numeric " +
+                "box does: the game moves the slider there and handles the change as when the player drags it, " +
+                "rounded to the slider's step and kept within its range, on the part's symmetry counterparts too " +
+                "when the game does so. The slider by its label or by the name of its field (the same in every " +
+                "language of the game), as read_part_menus gives them. Then reads the windows as read_part_menus " +
+                "does. Refuses a slider the window does not show, and any input lock that makes the game ignore the " +
+                "slider but the one KSP sets when its window loses the focus.",
+                Schema.Object(
+                    Schema.P("part", "number", "the part's id, as list_parts gives it", true),
+                    Schema.P("field", "string",
+                        "the label of the slider, or the name of its field, as read_part_menus gives them (case ignored)",
+                        true),
+                    Schema.P("value", "number", "the number to set", true)),
+                SetPartMenuValue);
+            yield return new Tool("list_docking_ports",
+                "Lists the docking ports of the active vessel, or of another loaded vessel: the part's id, as the " +
+                "other part tools take it, its title, the state of the port as the game names it, the id of the port " +
+                "it is docked to, and whether its part action window offers to undock: of two ports docked " +
+                "together, the game offers it on one only, which press_part_button then undocks with its Undock " +
+                "button.",
+                Schema.Object(
+                    Schema.P("vessel", "string", "the vessel's id or name, as list_vessels gives them (default: the active vessel)")),
+                ListDockingPorts) { Concurrent = true };
         }
 
         private static IEnumerator ListParts(ToolCall call)
@@ -231,6 +255,133 @@ namespace com.github.lhervier.ksp.util.mcpserver
             }
             yield return null;
             call.Text(Menus());
+        }
+
+        private static IEnumerator SetPartMenuValue(ToolCall call)
+        {
+            if (!Require.Flight(call))
+            {
+                yield break;
+            }
+            Part part = FindPart(call);
+            if (part == null)
+            {
+                yield break;
+            }
+            // The focus lock is lifted as press_part_button lifts it: the player's click would have given the focus
+            // back.
+            bool focusLocked = InputLockManager.lockStack.ContainsKey(FocusLock);
+            if (focusLocked)
+            {
+                InputLockManager.RemoveControlLock(FocusLock);
+                yield return null;
+                yield return null;
+            }
+            string failure = Slide(call, part);
+            if (focusLocked)
+            {
+                InputLockManager.SetControlLock(FocusLock);
+            }
+            if (failure != null)
+            {
+                call.Fail(failure);
+                yield break;
+            }
+            yield return null;
+            call.Text(Menus());
+        }
+
+        /// <summary>
+        /// Sets the slider the call names in the open window of a part to the call's value, as typing it in the
+        /// slider's numeric box does. Returns null once set, or why it could not be: no open window, no such slider
+        /// shown, or an input lock that makes the game ignore it.
+        /// </summary>
+        private static string Slide(ToolCall call, Part part)
+        {
+            UIPartActionWindow window = OpenWindow(part);
+            if (window == null)
+            {
+                return "The part action window of " + part.partInfo.title + " is not open";
+            }
+            string label = call.String("field");
+            UIPartActionFloatRange item = null;
+            foreach (UIPartActionItem i in window.ListItems)
+            {
+                UIPartActionFloatRange range = i as UIPartActionFloatRange;
+                if (range != null && range.gameObject.activeInHierarchy && range.Field != null
+                    && (string.Equals(range.Field.guiName, label, StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(range.Field.name, label, StringComparison.OrdinalIgnoreCase)))
+                {
+                    item = range;
+                    break;
+                }
+            }
+            if (item == null)
+            {
+                return "The window of " + part.partInfo.title + " shows no slider " + label;
+            }
+            if (!call.Has("value"))
+            {
+                return "Give the value to set";
+            }
+            UI_FloatRange control = (UI_FloatRange)item.Control;
+            // The slider's listener ignores a change while the tweakables are locked (OnValueChanged), the lock of
+            // full control for a slider that requires it.
+            ControlTypes locks = control.requireFullControl ? ControlTypes.TWEAKABLES_FULLONLY
+                : ControlTypes.TWEAKABLES_ANYCONTROL;
+            if (!InputLockManager.IsUnlocked(locks))
+            {
+                return "The game ignores the sliders of part action windows now: input locked by " +
+                    string.Join(", ", new List<string>(InputLockManager.lockStack.Keys).ToArray());
+            }
+            // What the numeric box does with the number typed (OnFieldInput): it moves the slider, whose listener
+            // rounds to the step, writes the field and calls the game's handlers, as for a drag.
+            float value = (float)call.Number("value");
+            item.slider.value = Mathf.Clamp01((value - control.minValue) / (control.maxValue - control.minValue));
+            return null;
+        }
+
+        private static IEnumerator ListDockingPorts(ToolCall call)
+        {
+            if (!Require.Flight(call))
+            {
+                yield break;
+            }
+            Vessel vessel = FlightGlobals.ActiveVessel;
+            if (call.Has("vessel"))
+            {
+                string error;
+                vessel = Lookup.FindVessel(call.String("vessel"), out error);
+                if (vessel == null)
+                {
+                    call.Fail(error);
+                    yield break;
+                }
+                if (!vessel.loaded)
+                {
+                    call.Fail(vessel.vesselName + " is not loaded: its parts are not in the scene");
+                    yield break;
+                }
+            }
+            List<object> ports = new List<object>();
+            foreach (Part p in vessel.parts)
+            {
+                foreach (ModuleDockingNode node in p.FindModulesImplementing<ModuleDockingNode>())
+                {
+                    BaseEvent undock = node.Events["Undock"];
+                    ports.Add(new Dictionary<string, object>
+                    {
+                        { "id", (double)p.persistentId },
+                        { "title", p.partInfo.title },
+                        { "state", node.fsm != null ? node.fsm.currentStateName : null },
+                        { "dockedTo", node.otherNode != null && node.otherNode.part != null
+                            ? (object)(double)node.otherNode.part.persistentId : null },
+                        // The window shows an event's button while the event is active and shown in flight.
+                        { "offersUndock", undock != null && undock.active && undock.guiActive }
+                    });
+                }
+            }
+            call.Text(ports);
         }
 
         /// <summary>
@@ -502,13 +653,30 @@ namespace com.github.lhervier.ksp.util.mcpserver
                     { "event", button.Evt != null ? button.Evt.name : null }
                 };
             }
+            UIPartActionFloatRange range = item as UIPartActionFloatRange;
+            UI_FloatRange rangeControl = range != null ? range.Control as UI_FloatRange : null;
+            if (rangeControl != null && range.Field != null)
+            {
+                object value = range.Field.GetValue(range.Field.host);
+                return new Dictionary<string, object>
+                {
+                    { "kind", "slider" },
+                    { "label", range.Field.guiName },
+                    { "name", range.Field.name },
+                    { "value", value is float ? (object)(double)(float)value : null },
+                    { "min", (double)rangeControl.minValue },
+                    { "max", (double)rangeControl.maxValue },
+                    { "step", (double)rangeControl.stepIncrement }
+                };
+            }
             UIPartActionFieldItem field = item as UIPartActionFieldItem;
             if (field != null)
             {
                 return new Dictionary<string, object>
                 {
                     { "kind", "field" },
-                    { "label", field.Field != null ? field.Field.guiName : null }
+                    { "label", field.Field != null ? field.Field.guiName : null },
+                    { "name", field.Field != null ? field.Field.name : null }
                 };
             }
             return new Dictionary<string, object> { { "kind", item.GetType().Name } };
