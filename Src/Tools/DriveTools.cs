@@ -29,12 +29,16 @@ namespace com.github.lhervier.ksp.util.mcpserver
         public static IEnumerable<Tool> All()
         {
             yield return new Tool("set_controls",
-                "Holds the wheel throttle and steering of the active vessel at the given values (−1 to 1) until " +
-                "changed; null or left out gives them back to the player. Steering: positive turns left. Also " +
-                "sets the brakes when given.",
+                "Holds the wheel throttle and steering, and the pitch, yaw and roll, of the active vessel at the " +
+                "given values (−1 to 1) until changed, as the player's keys give them (D gives a yaw of 1); null " +
+                "or left out gives them back to the player. Steering: positive turns left. Also sets the brakes " +
+                "when given.",
                 Schema.Object(
                     Schema.P("wheel_throttle", "number", "−1 (reverse) to 1 (forward)"),
                     Schema.P("wheel_steer", "number", "−1 to 1, positive to the left"),
+                    Schema.P("pitch", "number", "−1 to 1, as S (1) and W (−1) give it"),
+                    Schema.P("yaw", "number", "−1 to 1, as D (1) and A (−1) give it"),
+                    Schema.P("roll", "number", "−1 to 1, as E (1) and Q (−1) give it"),
                     Schema.P("brakes", "boolean", "brakes on or off")),
                 SetControls);
             yield return new Tool(DriveTool,
@@ -82,14 +86,20 @@ namespace com.github.lhervier.ksp.util.mcpserver
             {
                 yield break;
             }
-            Wheels.Hold(call.Has("wheel_throttle") ? (float)call.Number("wheel_throttle") : float.NaN,
-                call.Has("wheel_steer") ? (float)call.Number("wheel_steer") : float.NaN);
+            Wheels.Hold(Axis(call, "wheel_throttle"), Axis(call, "wheel_steer"));
+            Wheels.HoldAttitude(Axis(call, "pitch"), Axis(call, "yaw"), Axis(call, "roll"));
             if (call.Has("brakes"))
             {
                 Wheels.Brakes(FlightGlobals.ActiveVessel, call.Bool("brakes"));
             }
             yield return null;
             call.Text(GameState.State());
+        }
+
+        // A control axis given to set_controls, NaN when left out or null.
+        private static float Axis(ToolCall call, string name)
+        {
+            return call.Has(name) ? (float)call.Number(name) : float.NaN;
         }
 
         private static IEnumerator StopDrive(ToolCall call)
@@ -132,17 +142,10 @@ namespace com.github.lhervier.ksp.util.mcpserver
             return Math.Max(Math.Min(speed, 1.5), speed * Math.Max(0.2, cosine));
         }
 
-        // The direction a positive wheel throttle drives the rover in, in world space. The wheel motors drive
-        // along the up axis of the control point, or along its forward axis when the up axis stands upright,
-        // as on a part made to face up in the VAB (ModuleWheelMotor.GetMotorOrientationSign): of the two, the
-        // one closer to the ground.
+        // The direction a positive wheel throttle drives the rover in, in world space.
         private static Vector3d Forward(Vessel v)
         {
-            Transform reference = v.ReferenceTransform;
-            Vector3d up = (v.CoMD - v.mainBody.position).normalized;
-            return Math.Abs(Vector3d.Dot(reference.up, up)) <= Math.Abs(Vector3d.Dot(reference.forward, up))
-                ? (Vector3d)reference.up
-                : (Vector3d)reference.forward;
+            return Geo.RoverForward(v);
         }
 
         // Speed along the rover's forward direction, positive forward.

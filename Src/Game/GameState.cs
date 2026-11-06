@@ -67,6 +67,7 @@ namespace com.github.lhervier.ksp.util.mcpserver
                     { "surfaceSpeed", v.srfSpeed },
                     { "heading", Geo.Heading(v) },
                     { "pitch", Geo.Pitch(v) },
+                    { "roverHeading", Geo.RoverHeading(v) },
                     { "brakes", v.ActionGroups[KSPActionGroup.Brakes] },
                     { "lights", v.ActionGroups[KSPActionGroup.Light] },
                     { "gear", v.ActionGroups[KSPActionGroup.Gear] },

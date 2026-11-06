@@ -35,6 +35,26 @@ namespace com.github.lhervier.ksp.util.mcpserver
             return Heading(v, v.ReferenceTransform.up);
         }
 
+        /// <summary>
+        /// The direction a positive wheel throttle drives the vessel in, in world space: the up axis of the control
+        /// point, or its forward axis when the up axis stands upright, as on a part made to face up in the VAB
+        /// (ModuleWheelMotor.GetMotorOrientationSign); of the two, the one closer to the ground.
+        /// </summary>
+        public static Vector3d RoverForward(Vessel v)
+        {
+            Transform reference = v.ReferenceTransform;
+            Vector3d up = (v.CoMD - v.mainBody.position).normalized;
+            return Math.Abs(Vector3d.Dot(reference.up, up)) <= Math.Abs(Vector3d.Dot(reference.forward, up))
+                ? (Vector3d)reference.up
+                : (Vector3d)reference.forward;
+        }
+
+        /// <summary>The direction a rover's front faces, in degrees from north towards east.</summary>
+        public static double RoverHeading(Vessel v)
+        {
+            return Heading(v, RoverForward(v));
+        }
+
         /// <summary>The direction a world-space vector points in at a vessel, in degrees from north towards east.</summary>
         public static double Heading(Vessel v, Vector3d forward)
         {

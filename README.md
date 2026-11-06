@@ -49,7 +49,7 @@ paints the ground of Kerbin with the wrong texture until the space centre has be
 
 | tool | what it does |
 |---|---|
-| `get_state` | the scene, the pause, the time, the time warp rate, and the active vessel: id, name, situation, latitude, longitude, altitude, height above the terrain, speed, heading, pitch, brakes, lights, gear, SAS, whether it was destroyed (a vessel that crashed stays the active one), the local time where it is and the length of its body's day, its CommNet link (connected, signal strength, each hop of its control path with its length); in flight, whether the next alarm shows above the time display |
+| `get_state` | the scene, the pause, the time, the time warp rate, and the active vessel: id, name, situation, latitude, longitude, altitude, height above the terrain, speed, heading, pitch, heading of a rover's front, brakes, lights, gear, SAS, whether it was destroyed (a vessel that crashed stays the active one), the local time where it is and the length of its body's day, its CommNet link (connected, signal strength, each hop of its control path with its length); in flight, whether the next alarm shows above the time display |
 | `get_floating_origin` | the floating origin KSP keeps the world centred on: the vessel's distance from it, where it lies from the vessel (north, east, up), the distance at which KSP moves it, the moves since the scene opened |
 | `open_game` | opens a game's `persistent` save from any scene, the main menu included, as *Resume Game* does: always at the space centre, written back as `persistent`; returns once the buildings are set up |
 | `new_game` | starts a new career, science or sandbox game from the main menu, as *New Game* does at the Normal difficulty; a career's starting funds and funds penalties can be changed as the sliders of the Custom difficulty do |
@@ -94,7 +94,7 @@ paints the ground of Kerbin with the wrong texture until the space centre has be
 | `facility_menu` | opens a building's menu at the space centre, as a right click does, and reads it: level, damage, costs, funds; presses its *Upgrade* or *Repair* button and waits until KSP is done |
 | `close_screen` | closes what is open over the scene, as its own button does: a dialog, the flight results after a crash, a building's menu, the recovery report (at the space centre or in the tracking station), a building's screen |
 | `quit_game` | quits KSP, a second after answering |
-| `set_controls` | holds the wheel throttle and steering, and sets the brakes |
+| `set_controls` | holds the wheel throttle and steering, and the pitch, yaw and roll as the keys give them, and sets the brakes |
 | `set_flight` | sets the main throttle, turns SAS on or off and chooses its mode, as the pilot's keys do |
 | `stage` | activates the next stage, as the space bar does |
 | `list_parts` | the parts of the active vessel, or of another loaded vessel (on EVA, the one being built): the id the part tools take, name, title, resources, whether its part action window is open and pinned, and for a wheel whether it touches the ground |
