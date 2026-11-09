@@ -72,7 +72,7 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 "Calls a method of the first loaded object of a type, or a static one, and returns what it " +
                 "returns. Without arguments, the method that takes none; with arguments, the first method of that " +
                 "name that takes as many, each argument converted to its parameter's type (numbers, strings, " +
-                "booleans, enums, and {x, y, z} for a Vector3).",
+                "booleans, enums, and {x, y, z} for a Vector3 or a Vector3d).",
                 Schema.Object(
                     Schema.P("type", "string", "type name, full or short", true),
                     Schema.P("method", "string", "method name", true),
@@ -685,6 +685,11 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 Dictionary<string, object> d = (Dictionary<string, object>)json;
                 return new Vector3(F(d, "x"), F(d, "y"), F(d, "z"));
             }
+            if (type == typeof(Vector3d))
+            {
+                Dictionary<string, object> d = (Dictionary<string, object>)json;
+                return new Vector3d(D(d, "x"), D(d, "y"), D(d, "z"));
+            }
             if (type.IsEnum)
             {
                 return Enum.Parse(type, Convert.ToString(json, CultureInfo.InvariantCulture));
@@ -695,6 +700,11 @@ namespace com.github.lhervier.ksp.util.mcpserver
         private static float F(Dictionary<string, object> d, string key)
         {
             return d.ContainsKey(key) ? Convert.ToSingle(d[key], CultureInfo.InvariantCulture) : 0f;
+        }
+
+        private static double D(Dictionary<string, object> d, string key)
+        {
+            return d.ContainsKey(key) ? Convert.ToDouble(d[key], CultureInfo.InvariantCulture) : 0d;
         }
     }
 }

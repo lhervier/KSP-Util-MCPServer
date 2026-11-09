@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using KSP.Localization;
 using KSP.UI;
 using UnityEngine;
 using UnityEngine.UI;
@@ -9,7 +10,7 @@ namespace com.github.lhervier.ksp.util.mcpserver
 {
     /// <summary>
     /// Tools that work the part action windows (PAWs) of the loaded vessels' parts as the player does with the
-    /// mouse: right click on a part or on empty space, the pin, the buttons of a window.
+    /// mouse: right click on a part or on empty space, the pin, the buttons, sliders, switches and cycles of a window.
     /// </summary>
     internal static class PartMenuTools
     {
@@ -80,6 +81,21 @@ namespace com.github.lhervier.ksp.util.mcpserver
                         true),
                     Schema.P("value", "number", "the number to set", true)),
                 SetPartMenuValue);
+            yield return new Tool("click_part_menu_field",
+                "Clicks a switch or a cycle of a part's open part action window, as a click does: a switch (an on/off " +
+                "field) turns over, a cycle (a field that steps through named states, as the play direction of a " +
+                "robotic controller) moves to its next state, the game handling the change as for the player's click. " +
+                "The field by its label or by its name (the same in every language of the game), as read_part_menus " +
+                "gives them, with its value and, for a cycle, its states. Then reads the windows as read_part_menus " +
+                "does. Refuses a field the window does not show or the game does not let the player click, any input " +
+                "lock that makes the game ignore the click but the one KSP sets when its window loses the focus, and a " +
+                "click the game left without effect.",
+                Schema.Object(
+                    Schema.P("part", "number", "the part's id, as list_parts gives it", true),
+                    Schema.P("field", "string",
+                        "the label of the switch or cycle, or the name of its field, as read_part_menus gives them " +
+                        "(case ignored)", true)),
+                ClickPartMenuField);
             yield return new Tool("list_docking_ports",
                 "Lists the docking ports of the active vessel, or of another loaded vessel: the part's id, as the " +
                 "other part tools take it, its title, the state of the port as the game names it, the id of the port " +
@@ -339,6 +355,111 @@ namespace com.github.lhervier.ksp.util.mcpserver
             float value = (float)call.Number("value");
             item.slider.value = Mathf.Clamp01((value - control.minValue) / (control.maxValue - control.minValue));
             return null;
+        }
+
+        private static IEnumerator ClickPartMenuField(ToolCall call)
+        {
+            if (!Require.Flight(call))
+            {
+                yield break;
+            }
+            Part part = FindPart(call);
+            if (part == null)
+            {
+                yield break;
+            }
+            // The focus lock is lifted as press_part_button lifts it: the player's click would have given the focus
+            // back.
+            bool focusLocked = InputLockManager.lockStack.ContainsKey(FocusLock);
+            if (focusLocked)
+            {
+                InputLockManager.RemoveControlLock(FocusLock);
+                yield return null;
+                yield return null;
+            }
+            string failure = Click(call, part);
+            if (focusLocked)
+            {
+                InputLockManager.SetControlLock(FocusLock);
+            }
+            if (failure != null)
+            {
+                call.Fail(failure);
+                yield break;
+            }
+            yield return null;
+            call.Text(Menus());
+        }
+
+        /// <summary>
+        /// Clicks the switch or cycle the call names in the open window of a part, as the player's click does. Returns
+        /// null once its field changed, or why it could not be clicked or did not change: no open window, no such
+        /// field shown, a field the player cannot click, or an input lock that makes the game ignore the click.
+        /// </summary>
+        private static string Click(ToolCall call, Part part)
+        {
+            UIPartActionWindow window = OpenWindow(part);
+            if (window == null)
+            {
+                return "The part action window of " + part.partInfo.title + " is not open";
+            }
+            string label = call.String("field");
+            UIPartActionFieldItem item = null;
+            UIButtonToggle button = null;
+            foreach (UIPartActionItem i in window.ListItems)
+            {
+                UIButtonToggle b = ToggleButton(i);
+                UIPartActionFieldItem f = i as UIPartActionFieldItem;
+                if (b != null && f.gameObject.activeInHierarchy && f.Field != null
+                    && (string.Equals(f.Field.guiName, label, StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(f.Field.name, label, StringComparison.OrdinalIgnoreCase)))
+                {
+                    item = f;
+                    button = b;
+                    break;
+                }
+            }
+            if (item == null)
+            {
+                return "The window of " + part.partInfo.title + " shows no switch or cycle " + label;
+            }
+            if (button.ButtonCtrl == null || !button.ButtonCtrl.interactable)
+            {
+                return "The game does not let the player click " + item.Field.guiName + " now";
+            }
+            // OnTap of the switch and of the cycle does nothing while the tweakables are locked, the lock of full
+            // control for a field that requires it.
+            UI_Control control = item.Control;
+            ControlTypes locks = control != null && control.requireFullControl ? ControlTypes.TWEAKABLES_FULLONLY
+                : ControlTypes.TWEAKABLES_ANYCONTROL;
+            if (!InputLockManager.IsUnlocked(locks))
+            {
+                return "The game ignores the switches of part action windows now: input locked by " +
+                    string.Join(", ", new List<string>(InputLockManager.lockStack.Keys).ToArray());
+            }
+            object before = item.Field.GetValue(item.Field.host);
+            // What the player's click does: the button's own listener turns it over, then calls the item's OnTap,
+            // which writes the field and calls the game's handlers.
+            button.ButtonCtrl.onClick.Invoke();
+            object after = item.Field.GetValue(item.Field.host);
+            if (Equals(before, after))
+            {
+                return "The click left " + item.Field.guiName + " of " + part.partInfo.title + " as it was (" + before +
+                    "): the game does not turn it back by a click";
+            }
+            return null;
+        }
+
+        /// <summary>The button of a switch or a cycle of a part action window; null for any other item.</summary>
+        private static UIButtonToggle ToggleButton(UIPartActionItem item)
+        {
+            UIPartActionToggle toggle = item as UIPartActionToggle;
+            if (toggle != null)
+            {
+                return toggle.toggle;
+            }
+            UIPartActionCycle cycle = item as UIPartActionCycle;
+            return cycle != null ? cycle.toggle : null;
         }
 
         private static IEnumerator ListDockingPorts(ToolCall call)
@@ -667,6 +788,37 @@ namespace com.github.lhervier.ksp.util.mcpserver
                     { "min", (double)rangeControl.minValue },
                     { "max", (double)rangeControl.maxValue },
                     { "step", (double)rangeControl.stepIncrement }
+                };
+            }
+            UIPartActionToggle toggle = item as UIPartActionToggle;
+            if (toggle != null && toggle.Field != null)
+            {
+                object value = toggle.Field.GetValue(toggle.Field.host);
+                return new Dictionary<string, object>
+                {
+                    { "kind", "switch" },
+                    { "label", toggle.Field.guiName },
+                    { "name", toggle.Field.name },
+                    { "value", value is bool ? value : null }
+                };
+            }
+            UIPartActionCycle cycle = item as UIPartActionCycle;
+            UI_Cycle cycleControl = cycle != null ? cycle.Control as UI_Cycle : null;
+            if (cycleControl != null && cycle.Field != null)
+            {
+                object value = cycle.Field.GetValue(cycle.Field.host);
+                List<object> states = new List<object>();
+                foreach (string state in cycleControl.stateNames)
+                {
+                    states.Add(Localizer.Format(state));
+                }
+                return new Dictionary<string, object>
+                {
+                    { "kind", "cycle" },
+                    { "label", cycle.Field.guiName },
+                    { "name", cycle.Field.name },
+                    { "value", value is int ? (object)(double)(int)value : null },
+                    { "states", states }
                 };
             }
             UIPartActionFieldItem field = item as UIPartActionFieldItem;
