@@ -137,3 +137,86 @@ def _place(pid, x, timeout):
     rect, frame = bounds(hwnd)
     return "window moved after %.1f s: visible left edge %d px right of the work area, top %d, %d x %d" % (
         time.time() - began, frame.left - work.left, frame.top, frame.right - frame.left, frame.bottom - frame.top)
+
+
+def focus_window(folder=None):
+    """Gives the keyboard focus to the window of a running KSP, as a click on its title bar does: the window of
+    KSP_x64.exe, the one run from folder when given. Windows lets a background process bring a window to the
+    front only right after a key press: an Alt press and release is sent first. Never raises: returns one line
+    telling what was done, or why nothing was."""
+    if os.name != "nt":
+        return "focus not given: only done on Windows"
+    try:
+        return _focus(folder)
+    except Exception as e:
+        return "focus not given: %s" % e
+
+
+def _focus(folder):
+    from ctypes import wintypes
+    user32 = ctypes.WinDLL("user32", use_last_error=True)
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    enum_proc = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+    user32.EnumWindows.argtypes = [enum_proc, wintypes.LPARAM]
+    user32.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+    user32.GetClassNameW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+    user32.IsWindowVisible.argtypes = [wintypes.HWND]
+    user32.IsIconic.argtypes = [wintypes.HWND]
+    user32.ShowWindow.argtypes = [wintypes.HWND, ctypes.c_int]
+    user32.SetForegroundWindow.argtypes = [wintypes.HWND]
+    user32.GetForegroundWindow.restype = wintypes.HWND
+    user32.keybd_event.argtypes = [wintypes.BYTE, wintypes.BYTE, wintypes.DWORD, ctypes.c_void_p]
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel32.QueryFullProcessImageNameW.argtypes = [wintypes.HANDLE, wintypes.DWORD, wintypes.LPWSTR,
+                                                    ctypes.POINTER(wintypes.DWORD)]
+    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+    SW_RESTORE = 9
+    VK_MENU = 0x12
+    KEYEVENTF_KEYUP = 0x0002
+
+    def image(pid):
+        handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+        if not handle:
+            return ""
+        try:
+            size = wintypes.DWORD(1024)
+            path = ctypes.create_unicode_buffer(1024)
+            return path.value if kernel32.QueryFullProcessImageNameW(handle, 0, path, ctypes.byref(size)) else ""
+        finally:
+            kernel32.CloseHandle(handle)
+
+    found = []
+
+    def visit(hwnd, _):
+        if not user32.IsWindowVisible(hwnd):
+            return True
+        name = ctypes.create_unicode_buffer(64)
+        user32.GetClassNameW(hwnd, name, 64)
+        if name.value != "UnityWndClass":
+            return True
+        owner = wintypes.DWORD()
+        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(owner))
+        exe = image(owner.value)
+        if os.path.basename(exe).lower() != "ksp_x64.exe":
+            return True
+        if folder and os.path.normcase(os.path.dirname(exe)) != os.path.normcase(os.path.abspath(folder)):
+            return True
+        found.append(hwnd)
+        return False
+
+    user32.EnumWindows(enum_proc(visit), 0)
+    if not found:
+        return "focus not given: no window of KSP_x64.exe" + (" run from %s" % folder if folder else "")
+    hwnd = found[0]
+    if user32.IsIconic(hwnd):
+        user32.ShowWindow(hwnd, SW_RESTORE)
+    # Windows grants the foreground to the process that received the last input: a key press of our own.
+    user32.keybd_event(VK_MENU, 0, 0, None)
+    user32.keybd_event(VK_MENU, 0, KEYEVENTF_KEYUP, None)
+    user32.SetForegroundWindow(hwnd)
+    time.sleep(0.2)
+    if user32.GetForegroundWindow() == hwnd:
+        return "focus given to the window of KSP"
+    return "focus not given: Windows kept another window in front"

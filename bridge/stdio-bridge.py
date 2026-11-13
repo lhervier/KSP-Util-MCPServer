@@ -321,6 +321,13 @@ class Bridge:
                                                 "(default: where Windows puts it)"}},
                    ["install"]),
             self.start)
+        tools["ksp_focus"] = (
+            "Gives the keyboard focus to the window of the running KSP, as a click on it does: needed by the "
+            "tools that act as the player's keys or buttons (set_controls gear), which the game ignores while its "
+            "window does not have the focus. Windows only.",
+            schema({"install": {"type": "string", "enum": names,
+                                "description": "the KSP folder whose window to focus (default: any running KSP)"}}),
+            self.focus)
         tools["ksp_quit"] = (
             "Quits KSP and waits until its process has ended; log copies its KSP.log, which the next start "
             "overwrites. Quitting from a flight saves the active vessel in the game's persistent save. Refused "
@@ -344,6 +351,10 @@ class Bridge:
         if not isinstance(text, str):
             text = json.dumps(text, indent=1, ensure_ascii=False)
         return {"content": [{"type": "text", "text": text}], "isError": error}
+
+    def focus(self, arguments):
+        folder = self.folder(arguments, "install")[1] if arguments.get("install") else None
+        return kspwindow.focus_window(folder)
 
     def status(self, arguments):
         state = {"ksp_running": ksp_running(), "server": "down", "scene": None, "ksp_folder": None,
