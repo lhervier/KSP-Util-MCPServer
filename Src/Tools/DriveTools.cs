@@ -32,14 +32,16 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 "Holds the wheel throttle and steering, and the pitch, yaw and roll, of the active vessel at the " +
                 "given values (−1 to 1) until changed, as the player's keys give them (D gives a yaw of 1); null " +
                 "or left out gives them back to the player. Steering: positive turns left. Also sets the brakes " +
-                "when given.",
+                "when given, and the landing gear as its button by the altimeter does: refused while the game locks " +
+                "the gear group, and without effect on a vessel that cannot be controlled.",
                 Schema.Object(
                     Schema.P("wheel_throttle", "number", "−1 (reverse) to 1 (forward)"),
                     Schema.P("wheel_steer", "number", "−1 to 1, positive to the left"),
                     Schema.P("pitch", "number", "−1 to 1, as S (1) and W (−1) give it"),
                     Schema.P("yaw", "number", "−1 to 1, as D (1) and A (−1) give it"),
                     Schema.P("roll", "number", "−1 to 1, as E (1) and Q (−1) give it"),
-                    Schema.P("brakes", "boolean", "brakes on or off")),
+                    Schema.P("brakes", "boolean", "brakes on or off"),
+                    Schema.P("gear", "boolean", "landing gear and legs down (true) or up (false)")),
                 SetControls);
             yield return new Tool(DriveTool,
                 "Drives the active rover along a heading at a given speed, steering to hold it, then stops with " +
@@ -91,6 +93,23 @@ namespace com.github.lhervier.ksp.util.mcpserver
             if (call.Has("brakes"))
             {
                 Wheels.Brakes(FlightGlobals.ActiveVessel, call.Bool("brakes"));
+            }
+            if (call.Has("gear"))
+            {
+                // What the gear button by the altimeter does (ActionGroupToggleButton.SetToggle): the group set,
+                // once its cooldown is over, unless the game locks it; the vessel's own control blocks it further.
+                Vessel v = FlightGlobals.ActiveVessel;
+                if (!InputLockManager.IsUnlocked(ControlTypes.GROUP_GEARS))
+                {
+                    call.Fail("the game locks the landing gear group");
+                    yield break;
+                }
+                if (v.ActionGroups.CooldownTimeRemaining(KSPActionGroup.Gear) > 0.0)
+                {
+                    call.Fail("the landing gear group is cooling down, try again in a moment");
+                    yield break;
+                }
+                v.ActionGroups.SetGroup(KSPActionGroup.Gear, call.Bool("gear"));
             }
             yield return null;
             call.Text(GameState.State());
