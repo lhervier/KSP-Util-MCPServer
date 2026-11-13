@@ -34,6 +34,7 @@ import kspwindow
 DEFAULT_URL = "http://127.0.0.1:8770/mcp/"
 PROBE_PERIOD = 5
 PROBE_TIMEOUT = 5
+AWAKE_PERIOD = 15
 EXECUTABLES = ["KSP_x64.exe", "KSP.x86_64", os.path.join("KSP.app", "Contents", "MacOS", "KSP")]
 
 
@@ -151,6 +152,7 @@ class Bridge:
         self.game_tools = self.read_cache()
         self.served = None
         self.up = None
+        self.awake = False
         self.own = self.own_tools()
 
     # ---- the client side
@@ -166,6 +168,8 @@ class Bridge:
         """Answers the client until it closes the standard input, each request on a thread of its own, so that a
         long tool does not hold up the others, nor their cancellation."""
         threading.Thread(target=self.watch, daemon=True).start()
+        if os.name == "nt":
+            threading.Thread(target=self.keep_awake, daemon=True).start()
         for line in sys.stdin.buffer:
             if not line.strip():
                 continue
@@ -273,6 +277,30 @@ class Bridge:
                 log("checking the server failed: %r" % e)
             time.sleep(PROBE_PERIOD)
 
+    def keep_awake(self):
+        """Keeps the display and the computer awake while a KSP runs, for as long as this script runs, so that a
+        test is not cut short by the screen going to sleep or the session locking. Windows only. The request
+        belongs to this thread: Windows drops it when KSP ends, or when this script ends, however it ends."""
+        import ctypes
+        ES_CONTINUOUS = 0x80000000
+        ES_SYSTEM_REQUIRED = 0x00000001
+        ES_DISPLAY_REQUIRED = 0x00000002
+        set_state = ctypes.windll.kernel32.SetThreadExecutionState
+        set_state.argtypes = [ctypes.c_uint]
+        set_state.restype = ctypes.c_uint
+        while True:
+            try:
+                running = ksp_running()
+                if running != self.awake:
+                    flags = ES_CONTINUOUS | (ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED if running else 0)
+                    if set_state(flags) == 0:
+                        log("SetThreadExecutionState refused 0x%x" % flags)
+                    else:
+                        self.awake = running
+            except Exception as e:
+                log("keeping the computer awake failed: %r" % e)
+            time.sleep(AWAKE_PERIOD)
+
     def read_cache(self):
         """Returns the tools of the game kept in the cache file, or none when there is no such file."""
         try:
@@ -358,7 +386,8 @@ class Bridge:
 
     def status(self, arguments):
         state = {"ksp_running": ksp_running(), "server": "down", "scene": None, "ksp_folder": None,
-                 "install": None, "installs": self.installs, "started_by_bridge": self.started}
+                 "install": None, "installs": self.installs, "started_by_bridge": self.started,
+                 "keeping_awake": self.awake}
         try:
             self.server.tools()
             state["server"] = "up"
