@@ -635,7 +635,8 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 Vector3 velocity = surface - Krakensbane.GetFrameVelocity();
                 foreach (Part part in vessel.parts)
                 {
-                    if (part.rb != null)
+                    // A kinematic body has no velocity to set, and Unity 6 (KSP Retooled) warns when one is set.
+                    if (part.rb != null && !part.rb.isKinematic)
                     {
                         part.rb.velocity = velocity;
                         part.rb.angularVelocity = Vector3.zero;
