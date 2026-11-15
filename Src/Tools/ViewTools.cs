@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using KSP.UI.Screens.Mapview;
 using UnityEngine;
 
 namespace com.github.lhervier.ksp.util.mcpserver
@@ -60,6 +61,18 @@ namespace com.github.lhervier.ksp.util.mcpserver
                         "the camera's distance from what it is centred on, in units of the map (6 km each), within " +
                         "the limits the game sets for it")),
                 MapViewTool);
+            yield return new Tool("read_map_icon",
+                "In the map view, reads where the icon of a vessel is drawn, and where the vessel's latitude, " +
+                "longitude and altitude (those its caption shows) lie on its body as the map draws it, at the end of " +
+                "each of a number of rendered frames in a row, once the game has drawn them. Answers, over those " +
+                "frames, how many showed the icon and the mean and largest gap between the two points, in pixels; " +
+                "and, when asked, each frame: both points as mouse_move takes them, the gap, whether the icon " +
+                "showed, the time warp rate.",
+                Schema.Object(
+                    Schema.P("vessel", "string", "the vessel's id, or its name when no other vessel bears it", true),
+                    Schema.P("frames", "number", "how many rendered frames in a row to read, 1 to 1000 (default 1)"),
+                    Schema.P("each_frame", "boolean", "whether to answer each frame too (default false)")),
+                ReadMapIcon) { Concurrent = true };
             yield return new Tool("iva_view",
                 "Enters the IVA view of the active vessel, or leaves it for the flight view, as the C key does, " +
                 "and answers once the game shows the view asked for. Refuses when the game would not take the " +
@@ -251,6 +264,145 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 call.Fail(vessel.vesselName + " has no object in the map view");
             }
             return vessel.mapObject;
+        }
+
+        // Protected internal in OrbitRendererBase: the icon of the vessel or body in the map view.
+        private static readonly FieldInfo ObjectNode = typeof(OrbitRendererBase).GetField("objectNode",
+            BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+
+        private const int MaxMapIconFrames = 1000;
+
+        private static IEnumerator ReadMapIcon(ToolCall call)
+        {
+            if (!HighLogic.LoadedSceneIsFlight || !MapView.MapIsEnabled)
+            {
+                call.Fail("Not in the map view of a flight");
+                yield break;
+            }
+            string error;
+            Vessel vessel = Lookup.FindVessel(call.String("vessel"), out error);
+            if (vessel == null)
+            {
+                call.Fail(error);
+                yield break;
+            }
+            int frames = (int)call.Number("frames", 1);
+            if (frames < 1 || frames > MaxMapIconFrames)
+            {
+                call.Fail("frames must be between 1 and " + MaxMapIconFrames);
+                yield break;
+            }
+            bool eachFrame = call.Bool("each_frame", false);
+
+            List<object> samples = new List<object>();
+            int read = 0;
+            int shown = 0;
+            double gapSum = 0;
+            double gapMax = 0;
+            for (int i = 0; i < frames; i++)
+            {
+                // After every LateUpdate, the icons' included: what the frame shows.
+                yield return new WaitForEndOfFrame();
+                if (vessel == null || !MapView.MapIsEnabled)
+                {
+                    call.Fail("The vessel or the map view went away after " + read + " frames");
+                    yield break;
+                }
+                MapNode node = vessel.orbitRenderer != null ? ObjectNode.GetValue(vessel.orbitRenderer) as MapNode : null;
+                // The node is only placed while it shows: hidden, its place is stale.
+                bool iconShown = node != null && node.gameObject.activeInHierarchy && node.VisualIconData.visible;
+                Vector2? icon = iconShown ? IconScreenPoint(node) : (Vector2?)null;
+                Vector2? place = PlaceScreenPoint(vessel);
+                double? gap = null;
+                if (icon.HasValue && place.HasValue)
+                {
+                    gap = (icon.Value - place.Value).magnitude;
+                    gapSum += gap.Value;
+                    gapMax = Math.Max(gapMax, gap.Value);
+                    shown++;
+                }
+                read++;
+                if (eachFrame)
+                {
+                    samples.Add(new Dictionary<string, object>
+                    {
+                        { "icon", Point(icon) },
+                        { "place", Point(place) },
+                        { "gap", gap.HasValue ? (object)Math.Round(gap.Value, 1) : null },
+                        { "shown", iconShown },
+                        { "warpRate", (double)TimeWarp.CurrentRate }
+                    });
+                }
+            }
+            Dictionary<string, object> answer = new Dictionary<string, object>
+            {
+                { "vessel", vessel.vesselName },
+                { "frames", read },
+                { "shownFrames", shown },
+                { "gapMean", shown > 0 ? (object)Math.Round(gapSum / shown, 1) : null },
+                { "gapMax", shown > 0 ? (object)Math.Round(gapMax, 1) : null },
+                { "warpRate", (double)TimeWarp.CurrentRate }
+            };
+            if (eachFrame)
+            {
+                answer["each"] = samples;
+            }
+            call.Text(answer);
+        }
+
+        /// <summary>
+        /// Where the map icon <paramref name="node"/> is drawn, in pixels of the game's window from its top left
+        /// corner, y down.
+        /// </summary>
+        private static Vector2 IconScreenPoint(MapNode node)
+        {
+            Canvas canvas = node.GetComponentInParent<Canvas>();
+            Camera camera = null;
+            if (canvas != null && canvas.rootCanvas.renderMode != RenderMode.ScreenSpaceOverlay)
+            {
+                camera = canvas.rootCanvas.worldCamera;
+            }
+            Vector2 point = RectTransformUtility.WorldToScreenPoint(camera, node.transform.position);
+            return new Vector2(point.x, Screen.height - 1 - point.y);
+        }
+
+        /// <summary>
+        /// Where the latitude, longitude and altitude of <paramref name="vessel"/> lie on its body as the map view
+        /// draws it, in pixels of the game's window from its top left corner, y down; null when that point is behind
+        /// the map's camera.
+        /// </summary>
+        private static Vector2? PlaceScreenPoint(Vessel vessel)
+        {
+            CelestialBody body = vessel.mainBody;
+            Camera camera = PlanetariumCamera.Camera;
+            if (body == null || body.scaledBody == null || camera == null)
+            {
+                return null;
+            }
+            // The point in the frame of the body's transform, then through the drawn body's transform, scaled down.
+            Vector3d world = body.GetWorldSurfacePosition(vessel.latitude, vessel.longitude, vessel.altitude);
+            Vector3 local = Quaternion.Inverse(body.transform.rotation) * (Vector3)(world - body.position);
+            Transform drawn = body.scaledBody.transform;
+            Vector3d scaled = (Vector3d)drawn.position + (Vector3d)(drawn.rotation * (local * ScaledSpace.InverseScaleFactor));
+            Vector3 point = camera.WorldToScreenPoint(scaled);
+            if (point.z <= 0)
+            {
+                return null;
+            }
+            return new Vector2(point.x, Screen.height - 1 - point.y);
+        }
+
+        private static object Point(Vector2? point)
+        {
+            if (!point.HasValue)
+            {
+                return null;
+            }
+            return new Dictionary<string, object>
+            {
+                { "x", Math.Round(point.Value.x, 1) },
+                { "y", Math.Round(point.Value.y, 1) }
+            };
         }
 
         private static IEnumerator Screenshot(ToolCall call)
