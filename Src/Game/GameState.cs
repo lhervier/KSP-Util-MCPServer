@@ -71,7 +71,11 @@ namespace com.github.lhervier.ksp.util.mcpserver
                     { "brakes", v.ActionGroups[KSPActionGroup.Brakes] },
                     { "lights", v.ActionGroups[KSPActionGroup.Light] },
                     { "gear", v.ActionGroups[KSPActionGroup.Gear] },
-                    { "sas", v.ActionGroups[KSPActionGroup.SAS] }
+                    { "sas", v.ActionGroups[KSPActionGroup.SAS] },
+                    // The speed above the navball, in the mode its button shows: relative to the target in Target
+                    // mode.
+                    { "speedMode", FlightGlobals.speedDisplayMode.ToString() },
+                    { "speed", FlightGlobals.GetDisplaySpeed() }
                 };
                 // A vessel that crashed stays the active one, with the situation it had, until the flight is left.
                 if (v.state == Vessel.State.DEAD)

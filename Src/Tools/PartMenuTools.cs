@@ -48,7 +48,7 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 "Reads the open part action windows: for each, the part's id and title, whether it is pinned, where " +
                 "it is on screen (x, y of its top left corner and its size, in pixels from the top left corner of the " +
                 "game's window), and the items it shows: buttons (their label and the name of their event), fields " +
-                "(their label), resources " +
+                "(their label, and for a read-only one the line it shows, value included), resources " +
                 "(amount and capacity), and " +
                 "the resource transfer controls: which of their In, Out and Stop buttons show, their state (None, " +
                 "In, Out) and how many controls of other parts they are linked with.",
@@ -824,12 +824,19 @@ namespace com.github.lhervier.ksp.util.mcpserver
             UIPartActionFieldItem field = item as UIPartActionFieldItem;
             if (field != null)
             {
-                return new Dictionary<string, object>
+                Dictionary<string, object> described = new Dictionary<string, object>
                 {
                     { "kind", "field" },
                     { "label", field.Field != null ? field.Field.guiName : null },
                     { "name", field.Field != null ? field.Field.name : null }
                 };
+                // A read-only field: the line the window shows, its label and value as the game formats them.
+                UIPartActionLabel shown = item as UIPartActionLabel;
+                if (shown != null && shown.labelText != null)
+                {
+                    described["text"] = shown.labelText.text;
+                }
+                return described;
             }
             return new Dictionary<string, object> { { "kind", item.GetType().Name } };
         }

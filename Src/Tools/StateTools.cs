@@ -17,7 +17,8 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 "(degrees from north, towards east), pitch (degrees above the horizon, as the navball shows it), the " +
                 "heading of a rover's front (where a positive wheel throttle drives it, which holds when the control " +
                 "point faces up), " +
-                "brakes, lights, gear, SAS, destroyed (only when it crashed), the local time where it is (the fraction of " +
+                "brakes, lights, gear, SAS, the speed shown above the navball and its mode (Surface, Orbit or Target: " +
+                "relative to the target), destroyed (only when it crashed), the local time where it is (the fraction of " +
                 "its body's solar day, 0.5 at noon) with the length of that day in seconds, and its link to the " +
                 "CommNet network: connected or not, signal strength, and each hop of its control path with its " +
                 "length in metres. In flight, also whether the next alarm shows above the time display, as the " +
