@@ -35,6 +35,12 @@ and the tools of other mods — run at any time: `get_state` answers while `driv
 stopped when its client cancels the call (`notifications/cancelled` of MCP), or after ten minutes; it
 then lets go of what it holds, the wheels of a rover say.
 
+KSP names a scene as soon as it is asked for, seconds before the scene has loaded, and a scene left before
+it is up stays broken for the session (the Messages window of the main menu then stays open, with no button
+to close it). So a tool that acts first waits for the scene being loaded to be up, its toolbar included, and
+fails if it is not after three minutes; `get_state` waits for it up to 4 seconds, then answers with
+`loading` true if it still loads.
+
 A request whose body or answer takes over 30 seconds to go through has its connection dropped, so that a
 client gone silent cannot hold the server. The server also asks itself, every 15 seconds, whether it still
 answers: after two checks in a row without an answer, it closes its port and opens it again, and says so in
@@ -49,7 +55,7 @@ paints the ground of Kerbin with the wrong texture until the space centre has be
 
 | tool | what it does |
 |---|---|
-| `get_state` | the scene, the pause, the time, the time warp rate, and the active vessel: id, name, situation, latitude, longitude, altitude, height above the terrain, speed, heading, pitch, heading of a rover's front, brakes, lights, gear, SAS, the speed shown above the navball and its mode (surface, orbit, or relative to the target), whether it was destroyed (a vessel that crashed stays the active one), the local time where it is and the length of its body's day, its CommNet link (connected, signal strength, each hop of its control path with its length); in flight, whether the next alarm shows above the time display |
+| `get_state` | the scene (and whether it is still loading), the pause, the time, the time warp rate, and the active vessel: id, name, situation, latitude, longitude, altitude, height above the terrain, speed, heading, pitch, heading of a rover's front, brakes, lights, gear, SAS, the speed shown above the navball and its mode (surface, orbit, or relative to the target), whether it was destroyed (a vessel that crashed stays the active one), the local time where it is and the length of its body's day, its CommNet link (connected, signal strength, each hop of its control path with its length); in flight, whether the next alarm shows above the time display |
 | `get_floating_origin` | the floating origin KSP keeps the world centred on: the vessel's distance from it, where it lies from the vessel (north, east, up), the distance at which KSP moves it, the moves since the scene opened |
 | `open_game` | opens a game's `persistent` save from any scene, the main menu included, as *Resume Game* does: always at the space centre, written back as `persistent`; returns once the buildings are set up |
 | `new_game` | starts a new career, science or sandbox game from the main menu, as *New Game* does at the Normal difficulty; a career's starting funds and funds penalties can be changed as the sliders of the Custom difficulty do |
@@ -208,7 +214,7 @@ or comes back with other mods, the assistant gets the new list. It adds three to
 | tool | what it does |
 |---|---|
 | `ksp_status` | whether KSP is running, whether its server answers, and the scene of the game |
-| `ksp_start` | starts KSP from one of the folders given with `--ksp`, and waits for the main menu; `keep_log` copies the previous `KSP.log` first, as KSP overwrites it when it starts; on Windows, `window_x` moves the window of KSP sideways as soon as it shows (0 sticks it to the left of the screen), as KSP always opens it in the middle |
+| `ksp_start` | starts KSP from one of the folders given with `--ksp`, and waits until the main menu has loaded; `keep_log` copies the previous `KSP.log` first, as KSP overwrites it when it starts; on Windows, `window_x` moves the window of KSP sideways as soon as it shows (0 sticks it to the left of the screen), as KSP always opens it in the middle |
 | `ksp_quit` | quits KSP, waits until it has ended, and can copy its `KSP.log` |
 
 `ksp_start` starts only the folders given with `--ksp`, each under a name of your choice. With Claude Code:

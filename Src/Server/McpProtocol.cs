@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -120,8 +121,10 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 : null;
 
             ToolCall call = new ToolCall(arguments);
+            // A tool that acts waits for the scene being loaded: one that leaves it too early breaks the game.
+            IEnumerator run = tool.Concurrent ? tool.Run(call) : SceneLoad.Then(call, () => tool.Run(call));
             Exception failure = MainThread.RunAndWait(name, id, tool.Concurrent,
-                ToolMessage.Announced(name, call.Arguments, tool.Run(call)));
+                ToolMessage.Announced(name, call.Arguments, run));
             if (failure is MainThread.BusyException || failure is TimeoutException)
             {
                 call.Fail(failure.Message);

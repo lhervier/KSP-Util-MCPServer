@@ -9,10 +9,14 @@ namespace com.github.lhervier.ksp.util.mcpserver
     /// <summary>Tools that read the game without changing it, and the tool that lets it run.</summary>
     internal static class StateTools
     {
+        /// <summary>How long get_state waits for a scene being loaded before it answers anyway.</summary>
+        private const float StateLoadSeconds = 4f;
+
         public static IEnumerable<Tool> All()
         {
             yield return new Tool("get_state",
-                "Reads the game: the folder of the KSP that answers, scene, pause, universal time, time warp rate, and for the active vessel its id, " +
+                "Reads the game: the folder of the KSP that answers, scene (waiting up to 4 s for a scene being " +
+                "loaded, then loading true if it still is), pause, universal time, time warp rate, and for the active vessel its id, " +
                 "name, situation, latitude, longitude, altitude, height above the terrain, surface speed, heading " +
                 "(degrees from north, towards east), pitch (degrees above the horizon, as the navball shows it), the " +
                 "heading of a rover's front (where a positive wheel throttle drives it, which holds when the control " +
@@ -59,6 +63,8 @@ namespace com.github.lhervier.ksp.util.mcpserver
 
         private static IEnumerator GetState(ToolCall call)
         {
+            // Under the 5 s the relay gives each of its probes, ksp_start's among them.
+            yield return SceneLoad.WaitAtMost(StateLoadSeconds);
             Dictionary<string, object> state = GameState.State();
             state["kspFolder"] = Path.GetFullPath(KSPUtil.ApplicationRootPath);
             call.Text(state);

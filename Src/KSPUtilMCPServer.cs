@@ -84,6 +84,7 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 GameEvents.onFlightReady.Remove(OnFlightReady);
                 GameEvents.onGUIApplicationLauncherReady.Remove(_button.OnLauncherReady);
                 GameEvents.onGUIApplicationLauncherDestroyed.Remove(_button.OnLauncherDestroyed);
+                SceneLoad.Stop();
             }
         }
 
@@ -146,10 +147,13 @@ namespace com.github.lhervier.ksp.util.mcpserver
         private void Subscribe()
         {
             if (_subscribed || GameEvents.onFloatingOriginShift == null || GameEvents.onFlightReady == null
-                || GameEvents.onGUIApplicationLauncherReady == null || GameEvents.onGUIApplicationLauncherDestroyed == null)
+                || GameEvents.onGUIApplicationLauncherReady == null || GameEvents.onGUIApplicationLauncherDestroyed == null
+                || GameEvents.onGameSceneLoadRequested == null || GameEvents.onLevelWasLoadedGUIReady == null)
             {
                 return;
             }
+            // Before the main menu is asked for, which happens once KSP has loaded, long after this.
+            SceneLoad.Start();
             GameEvents.onFloatingOriginShift.Add(OnOriginShift);
             GameEvents.onFlightReady.Add(OnFlightReady);
             GameEvents.onGUIApplicationLauncherReady.Add(_button.OnLauncherReady);

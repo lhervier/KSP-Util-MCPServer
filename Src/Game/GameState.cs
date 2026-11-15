@@ -45,6 +45,11 @@ namespace com.github.lhervier.ksp.util.mcpserver
                     ? Planetarium.GetUniversalTime() : double.NaN },
                 { "warpRate", (double)TimeWarp.CurrentRate }
             };
+            // The scene is named as soon as it is asked for: no tool acts in it before it has loaded.
+            if (!SceneLoad.Loaded)
+            {
+                state["loading"] = true;
+            }
             // The row the alarm clock button, left of the time display, shows above it in flight.
             if (HighLogic.LoadedSceneIsFlight && FlightUIModeController.Instance != null)
             {

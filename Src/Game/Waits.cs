@@ -228,6 +228,119 @@ namespace com.github.lhervier.ksp.util.mcpserver
     }
 
     /// <summary>
+    /// Whether the scene KSP was last asked to load is there, followed from the moment the server starts.
+    /// <c>HighLogic.LoadedScene</c> names a scene as soon as it is asked for, seconds before it has loaded; a
+    /// scene left before it is up breaks the game for the session (the Messages window of the main menu stays
+    /// open, with no button to close it).
+    /// </summary>
+    internal sealed class SceneLoad
+    {
+        /// <summary>
+        /// Frames let pass once the scene is up before it counts as loaded: the apps of the toolbar add their
+        /// buttons about ten frames after it, and KSP gives no event once they all have.
+        /// </summary>
+        private const int SettleFrames = 30;
+
+        private static SceneLoad _instance;
+
+        private bool _requested;
+        private GameScenes _scene;
+        private int _upFrame = -1;
+
+        private SceneLoad()
+        {
+        }
+
+        /// <summary>Starts following the scenes, once the game events exist. May be called more than once.</summary>
+        public static void Start()
+        {
+            if (_instance != null)
+            {
+                return;
+            }
+            _instance = new SceneLoad();
+            GameEvents.onGameSceneLoadRequested.Add(_instance.OnRequested);
+            GameEvents.onLevelWasLoadedGUIReady.Add(_instance.OnUp);
+        }
+
+        /// <summary>Stops following the scenes. May be called more than once.</summary>
+        public static void Stop()
+        {
+            if (_instance == null)
+            {
+                return;
+            }
+            GameEvents.onGameSceneLoadRequested.Remove(_instance.OnRequested);
+            GameEvents.onLevelWasLoadedGUIReady.Remove(_instance.OnUp);
+            _instance = null;
+        }
+
+        /// <summary>
+        /// Whether the scene last asked for has loaded, its interface included; true while KSP loads, no
+        /// scene having been asked for yet, and when the scenes are not followed.
+        /// </summary>
+        public static bool Loaded
+        {
+            get
+            {
+                SceneLoad load = _instance;
+                return load == null || !load._requested
+                    || (load._upFrame >= 0 && Time.frameCount - load._upFrame >= SettleFrames);
+            }
+        }
+
+        /// <summary>
+        /// Waits until the scene last asked for has loaded; fails the call when it still has not after
+        /// <see cref="Waits.SceneSeconds"/>.
+        /// </summary>
+        public static IEnumerator Wait(ToolCall call)
+        {
+            return Waits.Until(call, () => Loaded, Waits.SceneSeconds,
+                "The scene " + HighLogic.LoadedScene + " was still loading after 3 minutes");
+        }
+
+        /// <summary>Waits until the scene last asked for has loaded, or <paramref name="seconds"/> at most.</summary>
+        public static IEnumerator WaitAtMost(float seconds)
+        {
+            float start = Time.realtimeSinceStartup;
+            while (!Loaded && Time.realtimeSinceStartup - start < seconds)
+            {
+                yield return null;
+            }
+        }
+
+        /// <summary>
+        /// Runs the coroutine that <paramref name="run"/> makes once the scene last asked for has loaded; not at
+        /// all when it does not load in time, the call failed then.
+        /// </summary>
+        public static IEnumerator Then(ToolCall call, Func<IEnumerator> run)
+        {
+            yield return Wait(call);
+            if (call.IsError)
+            {
+                yield break;
+            }
+            yield return run();
+        }
+
+        private void OnRequested(GameScenes scene)
+        {
+            _requested = true;
+            _scene = scene;
+            _upFrame = -1;
+        }
+
+        private void OnUp(GameScenes scene)
+        {
+            // The scene left may come up after the next one was asked for: it does not count.
+            if (_requested && scene == _scene)
+            {
+                _upFrame = Time.frameCount;
+            }
+        }
+    }
+
+    /// <summary>
     /// Records the last scene KSP is asked to load from the moment it starts, and whether that scene has
     /// loaded since. An instance, since an event refuses a static handler.
     /// </summary>

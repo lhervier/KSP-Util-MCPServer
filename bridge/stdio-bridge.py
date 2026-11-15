@@ -392,7 +392,7 @@ class Bridge:
             self.server.tools()
             state["server"] = "up"
             game = self.server.call("get_state", timeout=PROBE_TIMEOUT)
-            state["scene"] = game.get("scene")
+            state["scene"] = game.get("scene") + (" (loading)" if game.get("loading") else "")
             state["ksp_folder"] = game.get("kspFolder")
             state["install"] = self.install_of(state["ksp_folder"])
         except Unreachable:
@@ -440,7 +440,10 @@ class Bridge:
             if not ksp_running():
                 raise RuntimeError("KSP ended %.0f s after starting" % (time.time() - began))
             try:
-                if self.server.call("get_state", timeout=PROBE_TIMEOUT).get("scene") == "MAINMENU":
+                # The scene is named as soon as KSP asks for it: a main menu left before it has loaded breaks
+                # the game for the session.
+                game = self.server.call("get_state", timeout=PROBE_TIMEOUT)
+                if game.get("scene") == "MAINMENU" and not game.get("loading"):
                     # Read the tools now, rather than at the next check, so that the client has them on return.
                     self.game_seen(self.server.tools())
                     # The window shows long before the main menu: its line is there by now.
