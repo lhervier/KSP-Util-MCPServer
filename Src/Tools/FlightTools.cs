@@ -25,6 +25,80 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 "Activates the next stage of the active vessel, as the space bar does. Answers with the stage now " +
                 "current.",
                 Schema.Object(), Stage);
+            yield return new Tool("action_group",
+                "Fires a custom action group (1 to 10) of the active vessel, as its number key does: the group " +
+                "toggles, and each action bound to it runs. Refused while the game locks the custom action groups. " +
+                "Answers with the group's state after the press, and the messages the game put on the screen " +
+                "meanwhile (a part refusing an action says so there).",
+                Schema.Object(
+                    Schema.P("group", "number", "the custom group, 1 to 10, as its key", true)),
+                ActionGroup);
+        }
+
+        // The custom action groups, by the number of their key.
+        private static readonly KSPActionGroup[] CustomGroups =
+        {
+            KSPActionGroup.Custom01, KSPActionGroup.Custom02, KSPActionGroup.Custom03, KSPActionGroup.Custom04,
+            KSPActionGroup.Custom05, KSPActionGroup.Custom06, KSPActionGroup.Custom07, KSPActionGroup.Custom08,
+            KSPActionGroup.Custom09, KSPActionGroup.Custom10
+        };
+
+        private static IEnumerator ActionGroup(ToolCall call)
+        {
+            if (!Require.ActiveVessel(call))
+            {
+                yield break;
+            }
+            double number = call.Number("group");
+            if (double.IsNaN(number) || number != Math.Floor(number) || number < 1 || number > CustomGroups.Length)
+            {
+                call.Fail("group must be a whole number from 1 to " + CustomGroups.Length);
+                yield break;
+            }
+            // What a number key does (FlightInputHandler): the group toggled, unless the game locks them.
+            if (!InputLockManager.IsUnlocked(ControlTypes.CUSTOM_ACTION_GROUPS))
+            {
+                call.Fail("the game locks the custom action groups");
+                yield break;
+            }
+            KSPActionGroup group = CustomGroups[(int)number - 1];
+            Vessel v = FlightGlobals.ActiveVessel;
+
+            // The messages on the screen before the press, with the time each was shown, to tell apart those the
+            // press brings: a message posted again while its text is still shown is not a new one, the game only
+            // shows it again from the start.
+            var before = new Dictionary<ScreenMessage, float>();
+            if (ScreenMessages.Instance != null)
+            {
+                foreach (ScreenMessage message in ScreenMessages.Instance.ActiveMessages)
+                {
+                    if (message != null)
+                    {
+                        before[message] = message.startTime;
+                    }
+                }
+            }
+            v.ActionGroups.ToggleGroup(group);
+            yield return null;
+
+            var messages = new List<object>();
+            if (ScreenMessages.Instance != null)
+            {
+                foreach (ScreenMessage message in ScreenMessages.Instance.ActiveMessages)
+                {
+                    float shown;
+                    if (message != null && (!before.TryGetValue(message, out shown) || message.startTime != shown))
+                    {
+                        messages.Add(message.message);
+                    }
+                }
+            }
+            call.Text(new Dictionary<string, object>
+            {
+                { "group", (int)number },
+                { "on", v.ActionGroups[group] },
+                { "messages", messages }
+            });
         }
 
         private static IEnumerator SetFlight(ToolCall call)

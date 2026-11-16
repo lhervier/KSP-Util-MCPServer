@@ -104,6 +104,7 @@ paints the ground of Kerbin with the wrong texture until the space centre has be
 | `set_controls` | holds the wheel throttle and steering, and the pitch, yaw and roll as the keys give them, and sets the brakes |
 | `set_flight` | sets the main throttle, turns SAS on or off and chooses its mode, as the pilot's keys do |
 | `stage` | activates the next stage, as the space bar does |
+| `action_group` | fires a custom action group (1 to 10), as its number key does; answers with the group's state and the messages the game put on the screen meanwhile, such as a part refusing its action |
 | `list_parts` | the parts of the active vessel, or of another loaded vessel (on EVA, the one being built): the id the part tools take, name, title, resources, whether its part action window is open and pinned, and for a wheel whether it touches the ground |
 | `part_menu` | opens a part's action window as a right click on it does (the windows not pinned close), pins or unpins it, drags it to a point of the screen by its title bar, or closes every window not pinned as a right click on empty space does |
 | `read_part_menus` | the open part action windows, where they are on screen and what they show: buttons, fields (with the line a read-only one shows, its value included), sliders with their value, range and step, switches with their value, cycles with their value and states, resources, and the resource transfer controls with their buttons, state and links to the other parts' |
