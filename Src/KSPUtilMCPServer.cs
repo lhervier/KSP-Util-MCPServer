@@ -22,6 +22,7 @@ namespace com.github.lhervier.ksp.util.mcpserver
         private void Awake()
         {
             Log.SetMainThread();
+            Log.Info("Version " + McpProtocol.ServerVersion);
             DontDestroyOnLoad(gameObject);
             MainThread.SetHost(this);
 

@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 
 namespace com.github.lhervier.ksp.util.mcpserver
 {
@@ -13,7 +14,13 @@ namespace com.github.lhervier.ksp.util.mcpserver
     internal sealed class McpProtocol
     {
         public const string ServerName = "KSP-Util-MCPServer";
-        private const string ServerVersion = "0.1.1";
+
+        /// <summary>
+        /// The version of this build, from the .csproj: X.Y.Z for a release, X.Y.Z-dev between two releases,
+        /// followed by "+" and the id of the commit it was built from.
+        /// </summary>
+        public static readonly string ServerVersion = typeof(McpProtocol).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
         private const string DefaultProtocolVersion = "2025-06-18";
 
         private readonly Dictionary<string, Tool> _tools;
