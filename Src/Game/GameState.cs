@@ -95,9 +95,31 @@ namespace com.github.lhervier.ksp.util.mcpserver
                     vessel["solarDay"] = v.mainBody.solarDayLength;
                 }
                 vessel["commNet"] = CommNetState(v);
+                if (v.isEVA && v.evaController != null)
+                {
+                    vessel["eva"] = EvaState(v.evaController);
+                }
                 state["vessel"] = vessel;
             }
             return state;
+        }
+
+        /// <summary>
+        /// What a kerbal on EVA is doing: where it faces, the state of its state machine (walking, running,
+        /// idle...), whether it is on a ladder, fallen over (ragdoll), its jetpack on, and the movement
+        /// set_eva_controls, walk or walk_to hold for it.
+        /// </summary>
+        private static Dictionary<string, object> EvaState(KerbalEVA eva)
+        {
+            return new Dictionary<string, object>
+            {
+                { "facing", Geo.Heading(eva.vessel, eva.transform.forward) },
+                { "state", eva.fsm != null ? eva.fsm.currentStateName : null },
+                { "onLadder", eva.OnALadder },
+                { "ragdoll", eva.isRagdoll },
+                { "jetpack", eva.JetpackDeployed },
+                { "held", Walker.State(eva) }
+            };
         }
 
         /// <summary>

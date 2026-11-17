@@ -78,7 +78,9 @@ namespace com.github.lhervier.ksp.util.mcpserver
             yield return new Tool("stop_drive",
                 "Stops the rover: ends a drive or drive_to still running, whose call then fails, or else lets go " +
                 "of the wheels held by set_controls; puts the brakes on and waits for the rover to be still, " +
-                "unless the game is paused. Can be called while another tool runs.",
+                "unless the game is paused. Stops a kerbal on EVA the same way: ends a walk or walk_to, or lets go " +
+                "of the keys held by set_eva_controls, and waits for it to stand still. Can be called while " +
+                "another tool runs.",
                 Schema.Object(), StopDrive) { Concurrent = true };
         }
 
@@ -123,12 +125,15 @@ namespace com.github.lhervier.ksp.util.mcpserver
 
         private static IEnumerator StopDrive(ToolCall call)
         {
-            List<MainThread.Job> drives = MainThread.Cancel(j => j.Name == DriveTool || j.Name == DriveToTool,
+            List<MainThread.Job> drives = MainThread.Cancel(j => j.Name == DriveTool || j.Name == DriveToTool
+                    || j.Name == WalkTools.WalkTool || j.Name == WalkTools.WalkToTool,
                 "stopped by stop_drive");
-            // The drives let go of the wheels as they end; at once, in case they do not end now.
+            // The drives and walks let go as they end; at once, in case they do not end now.
             Wheels.Release();
+            Walker.Release();
             Vessel v = FlightGlobals.ActiveVessel;
-            if (v != null)
+            bool kerbal = v != null && v.isEVA;
+            if (v != null && !kerbal)
             {
                 Wheels.Brakes(v, true);
             }
@@ -145,7 +150,7 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 }
                 if (v != null && v == FlightGlobals.ActiveVessel)
                 {
-                    yield return StopAndSettle(v);
+                    yield return kerbal ? WalkTools.Settle(v) : StopAndSettle(v);
                 }
             }
             Dictionary<string, object> state = GameState.State();

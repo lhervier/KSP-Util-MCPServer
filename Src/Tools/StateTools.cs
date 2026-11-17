@@ -25,7 +25,9 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 "relative to the target), destroyed (only when it crashed), the local time where it is (the fraction of " +
                 "its body's solar day, 0.5 at noon) with the length of that day in seconds, and its link to the " +
                 "CommNet network: connected or not, signal strength, and each hop of its control path with its " +
-                "length in metres. In flight, also whether the next alarm shows above the time display, as the " +
+                "length in metres. For a kerbal on EVA, also eva: where it faces (degrees from north), the state " +
+                "it is in (walking, running, idle, on a ladder...), onLadder, ragdoll (fallen over), jetpack, and " +
+                "the heading and run held for it by set_eva_controls, walk or walk_to. In flight, also whether the next alarm shows above the time display, as the " +
                 "alarm clock button left of it toggles it.",
                 Schema.Object(), GetState) { Concurrent = true };
             yield return new Tool("get_floating_origin",

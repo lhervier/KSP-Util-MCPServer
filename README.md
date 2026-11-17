@@ -123,10 +123,17 @@ paints the ground of Kerbin with the wrong texture until the space centre has be
 Both drives slow down to take a sharp turn and never turn harder than keeps the rover on its wheels. How
 sharply a rover turns at each speed they learn as they drive, and remember for that vessel until the game
 is closed.
-| `stop_drive` | stops a `drive` or a `drive_to` still running, or the wheels `set_controls` holds, and brakes |
+| `stop_drive` | stops a `drive` or a `drive_to` still running, or the wheels `set_controls` holds, and brakes; stops a `walk` or a `walk_to`, or the keys `set_eva_controls` holds, the same way |
 
 A drive stops, the rover braked, when it tips over, when it runs away at twice the speed asked, when the
 active vessel changes or when the flight ends.
+| `set_eva_controls` | holds the movement keys of a kerbal on EVA: forward, back, left or right of where it faces, walking or running, as the keys do with the camera behind it; on a ladder, climbs up or down |
+| `walk` | walks or runs a kerbal on EVA along a heading for a distance, then waits for it to stand still |
+| `walk_to` | walks or runs a kerbal on EVA to a latitude and longitude, and stops there |
+
+A walk stops when the kerbal gets no further for five seconds, and fails when it falls over, grabs a
+ladder, or when the active vessel changes. `get_state` tells, for a kerbal on EVA, where it faces, what it
+is doing (walking, running, on a ladder...) and the movement held for it.
 | `get_member`, `set_member` | reads or writes a field or property of a loaded object of any mod — a window's position, say; `get_member` also follows a path of fields, list indexes and components, and reads several paths in the same frame |
 | `sample_members` | reads a list of members, of one object or several, at every rendered frame or every physics step, for a number of samples or seconds, and answers with a table, one row per sample; capped in rows and size |
 | `call_method` | calls a method of a loaded object of any mod, or a static one, with or without arguments |
