@@ -15,26 +15,13 @@ namespace com.github.lhervier.ksp.util.mcpserver
         public static IEnumerable<Tool> All()
         {
             yield return new Tool("get_state",
-                "Reads the game: the folder of the KSP that answers, scene (waiting up to 4 s for a scene being " +
-                "loaded, then loading true if it still is), pause, universal time, time warp rate, and for the active vessel its id, " +
-                "name, situation, latitude, longitude, altitude, height above the terrain, surface speed, heading " +
-                "(degrees from north, towards east), pitch (degrees above the horizon, as the navball shows it), the " +
-                "heading of a rover's front (where a positive wheel throttle drives it, which holds when the control " +
-                "point faces up), " +
-                "brakes, lights, gear, SAS, the speed shown above the navball and its mode (Surface, Orbit or Target: " +
-                "relative to the target), destroyed (only when it crashed), the local time where it is (the fraction of " +
-                "its body's solar day, 0.5 at noon) with the length of that day in seconds, and its link to the " +
-                "CommNet network: connected or not, signal strength, and each hop of its control path with its " +
-                "length in metres. For a kerbal on EVA, also eva: where it faces (degrees from north), the state " +
-                "it is in (walking, running, idle, on a ladder...), onLadder, ragdoll (fallen over), jetpack, and " +
-                "the heading and run held for it by set_eva_controls, walk or walk_to. In flight, also whether the next alarm shows above the time display, as the " +
-                "alarm clock button left of it toggles it.",
+                "Reads the game: scene (loading true while one loads), pause, time and warp, and the active " +
+                "vessel: id, name, situation, position, speed, heading, pitch, roverHeading, brakes, lights, " +
+                "gear, SAS, navball speed, local time, CommNet link, destroyed; eva for a kerbal on EVA.",
                 Schema.Object(), GetState) { Concurrent = true };
             yield return new Tool("get_floating_origin",
-                "Reads KSP's floating origin, the point the world is kept centred on: the active vessel's " +
-                "distance from it, where it lies from the vessel (metres north, east and up), the distance at " +
-                "which KSP moves it back onto the vessel, and the shifts counted since the flight scene opened " +
-                "with the length of the last one.",
+                "Reads KSP's floating origin: the active vessel's distance from it and its direction, the " +
+                "distance at which KSP shifts it, and the shifts counted since the flight opened.",
                 Schema.Object(), GetFloatingOrigin) { Concurrent = true };
             yield return new Tool("list_vessels",
                 "Lists the vessels of the game: id, name, situation, body, whether each is loaded and packed, " +
@@ -51,10 +38,9 @@ namespace com.github.lhervier.ksp.util.mcpserver
                     Schema.P("spacing", "number", "metres from the point to the four points of the slope (default 5)")),
                 GetTerrain) { Concurrent = true };
             yield return new Tool("list_rocs",
-                "Lists the surface features of Breaking Ground (ROCs) built near the active vessel, nearest first: " +
-                "their id, type and name, their distance from the active vessel in metres, the latitude, longitude " +
-                "and altitude of their pivot, the height of the terrain there and of the pivot above it, how many " +
-                "colliders they have and how many are on, and whether a part of the active vessel touches them.",
+                "Lists the Breaking Ground surface features (ROCs) near the active vessel, nearest first: id, " +
+                "type, distance, pivot position and height above the terrain, colliders, and whether the vessel " +
+                "touches them.",
                 Schema.Object(Schema.P("radius", "number", "metres from the active vessel (default 300)")),
                 ListRocs) { Concurrent = true };
             yield return new Tool("wait",

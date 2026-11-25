@@ -145,8 +145,12 @@ class Bridge:
         self.server = server
         self.installs = installs
         self.cache = cache
+        # beside the cache: one line per tool call (tool, size of what it gave back, duration)
+        self.accounts = os.path.join(os.path.dirname(cache), "tool-calls-" +
+                                     os.path.basename(cache).rsplit("-", 1)[-1].replace(".json", ".csv"))
         self.started = None
         self.output = threading.Lock()
+        self.accounts_lock = threading.Lock()
         self.state = threading.Lock()
         self.initialized = False
         self.game_tools = self.read_cache()
@@ -199,6 +203,12 @@ class Bridge:
             return  # an answer to a request: this bridge sends none
         id = message["id"]
         params = message.get("params") or {}
+        if method == "tools/call":
+            started = time.time()
+            answer = self.answer_call(message)
+            self.account(params.get("name"), answer, time.time() - started)
+            self.send(answer)
+            return
         try:
             if method == "initialize":
                 result = {"protocolVersion": params.get("protocolVersion", "2025-06-18"),
@@ -208,8 +218,6 @@ class Bridge:
                 result = {}
             elif method == "tools/list":
                 result = {"tools": self.list_tools()}
-            elif method == "tools/call" and params.get("name") in self.own:
-                result = self.call_own(params["name"], params.get("arguments") or {})
             else:
                 self.send(self.forward(message))
                 return
@@ -217,6 +225,41 @@ class Bridge:
         except Exception as e:
             log("%s failed: %r" % (method, e))
             self.send({"jsonrpc": "2.0", "id": id, "error": {"code": -32603, "message": str(e)}})
+
+    def answer_call(self, message):
+        """Returns the answer to one tools/call request: this bridge's own tool, or the server's."""
+        params = message.get("params") or {}
+        if params.get("name") not in self.own:
+            return self.forward(message)
+        try:
+            result = self.call_own(params["name"], params.get("arguments") or {})
+            return {"jsonrpc": "2.0", "id": message["id"], "result": result}
+        except Exception as e:
+            log("tools/call failed: %r" % e)
+            return {"jsonrpc": "2.0", "id": message["id"], "error": {"code": -32603, "message": str(e)}}
+
+    def account(self, tool, answer, seconds):
+        """Adds one line to the accounts file: what a tool call gave back to the client, and how long it took, so
+        that the cost of each tool in the client's context can be read afterwards. Never fails the call."""
+        try:
+            result = answer.get("result") or {}
+            text = image = 0
+            for item in result.get("content") or []:
+                if item.get("type") == "text":
+                    text += len(item.get("text", ""))
+                else:
+                    # an image or another binary item: its base64 data
+                    image += len(item.get("data", ""))
+            failed = 1 if ("error" in answer or result.get("isError")) else 0
+            line = "%s,%s,%d,%d,%.2f,%d\n" % (time.strftime("%Y-%m-%dT%H:%M:%S"), tool, text, image, seconds, failed)
+            new = not os.path.exists(self.accounts)
+            os.makedirs(os.path.dirname(self.accounts), exist_ok=True)
+            with self.accounts_lock, open(self.accounts, "a", encoding="utf-8", newline="") as f:
+                if new:
+                    f.write("time,tool,text_chars,image_chars,seconds,failed\n")
+                f.write(line)
+        except Exception as e:
+            log("could not write %s: %s" % (self.accounts, e))
 
     def forward(self, message):
         """Passes one request on to the server and returns its answer, or what to answer when it is not there."""
@@ -324,9 +367,8 @@ class Bridge:
         """Returns this bridge's tools, by name: their description, the schema of their arguments, and what
         runs them."""
         tools = {"ksp_status": (
-            "Tells whether KSP is running, whether its server answers, the folder of the KSP that answers and "
-            "which of this bridge's installs it is (none for another KSP), and in which scene the game is; also "
-            "the KSP folders ksp_start can start. Works while KSP is not running.",
+            "Tells whether KSP is running, whether its server answers, which KSP folder and install answers, "
+            "and the scene; also the folders ksp_start can start. Works while KSP is not running.",
             schema(), self.status)}
         if not self.installs:
             return tools
@@ -343,10 +385,9 @@ class Bridge:
                     "wait": {"type": "boolean", "description": "wait for the main menu (default true)"},
                     "timeout": {"type": "number", "description": "seconds to wait for the main menu (default 540)"},
                     "window_x": {"type": "integer",
-                                 "description": "pixels between the left edge of the work area of the primary "
-                                                "screen and the left edge of the window of KSP, 0 to stick it to "
-                                                "the left; its height on the screen and its size do not change "
-                                                "(default: where Windows puts it)"}},
+                                 "description": "left edge of KSP's window, in pixels from the left of the primary "
+                                                "screen's work area, 0 to stick it left (default: where Windows "
+                                                "puts it)"}},
                    ["install"]),
             self.start)
         tools["ksp_focus"] = (

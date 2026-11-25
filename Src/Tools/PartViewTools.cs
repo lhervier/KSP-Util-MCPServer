@@ -81,20 +81,13 @@ namespace com.github.lhervier.ksp.util.mcpserver
         public static IEnumerable<Tool> All()
         {
             yield return new Tool("locate_part",
-                "Finds a part of a loaded vessel on screen: the rectangle its colliders cover (x, y of its top left " +
-                "corner, width and height, in pixels from the top left corner of the game's window, as mouse_move " +
-                "takes them), and, casting rays from the camera over that rectangle as the game finds the part under " +
-                "the mouse, how much of the part shows (the share of the rays that meet the part and meet it first) " +
-                "and a point where the mouse would be over this part, with the interface objects drawn over that " +
-                "point. Also the colliders of the part, how many are triggers (a trigger collides with nothing), and " +
-                "whether it is the part selected in EVA construction, and how far it leans: the angle between its up " +
-                "axis and the vertical of the body below it. With find_view, first turns the flight camera " +
-                "around what it aims at (aim_camera) to the heading and pitch where the most of the part shows clear of the " +
-                "interface.",
+                "Finds a part of a loaded vessel on screen: the rectangle of its colliders, the share of it that " +
+                "shows, a point where the mouse would be over it (as mouse_move takes it), its colliders and " +
+                "triggers, and its tilt. find_view first turns the camera to show it best.",
                 Schema.Object(
                     Schema.P("part", "number", "the part's id, as list_parts gives it", true),
                     Schema.P("find_view", "boolean",
-                        "turn the camera to the heading and pitch where the most of the part shows clear of the interface (default false)")),
+                        "first turn the camera to where the most of the part shows (default false)")),
                 LocatePart);
             yield return new Tool("aim_camera",
                 "Aims the flight camera at a part of a loaded vessel, as the Aim Camera button of its part action " +
@@ -104,23 +97,17 @@ namespace com.github.lhervier.ksp.util.mcpserver
                     Schema.P("part", "number", "the part's id, as list_parts gives it (default: back to the active vessel)")),
                 AimCamera) { Concurrent = true };
             yield return new Tool("construction_tool",
-                "Opens or closes the construction panel of EVA construction, as its button in the toolbar does, " +
-                "and picks its Place, Move or Rotate tool, as its buttons do; answers with whether the panel is open, " +
-                "the tool in use and the part selected. The game opens the panel only for an engineer on EVA, and " +
-                "refuses Move and Rotate while the gizmos are locked and while a part is held from the Place tool: " +
-                "the answer then names the tool kept. Without panel or tool, only reads.",
+                "Opens or closes the EVA construction panel and picks its Place, Move or Rotate tool, as their " +
+                "buttons do (an engineer on EVA only). Answers with the panel, the tool in use and the selected " +
+                "part; without arguments, only reads.",
                 Schema.Object(
                     Schema.P("panel", "string", "open or close (default: left as it is)"),
                     Schema.P("tool", "string", "place, move or rotate (default: left as it is)")),
                 ConstructionTool);
             yield return new Tool("construction_gizmo",
-                "Drags the gizmo of the part selected in EVA construction, as a player drags one of its handles with " +
-                "the mouse: with the Move tool, along the x, y or z axis of the gizmo by distance metres; with the " +
-                "Rotate tool, around it by angle degrees. The drag is spread over steps frames, one move per frame, " +
-                "with the game's snapping applied as the handle applies it, then released, so that the game and the " +
-                "mods see every step and the release. Answers with the axis in world space, what was asked, what the " +
-                "snapping left of it and how far the part really went (along the axis, or around it), and the part's " +
-                "position at the end.",
+                "Drags the gizmo of the part selected in EVA construction as the mouse drags a handle: Move along " +
+                "the gizmo's x, y or z by distance metres, Rotate around it by angle degrees, over steps frames " +
+                "with the game's snapping. Answers with the axis in world space and how far the part went.",
                 Schema.Object(
                     Schema.P("axis", "string", "x, y or z: an axis of the gizmo, in the frame it shows (Absolute or Local)", true),
                     Schema.P("distance", "number", "Move tool: metres along the axis, negative the other way"),

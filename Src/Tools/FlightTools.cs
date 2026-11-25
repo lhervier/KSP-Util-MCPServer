@@ -26,10 +26,9 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 "current.",
                 Schema.Object(), Stage);
             yield return new Tool("action_group",
-                "Fires a custom action group (1 to 10) of the active vessel, as its number key does: the group " +
-                "toggles, and each action bound to it runs. Refused while the game locks the custom action groups. " +
-                "Answers with the group's state after the press, and the messages the game put on the screen " +
-                "meanwhile (a part refusing an action says so there).",
+                "Fires a custom action group (1 to 10) of the active vessel, as its number key does. Refused " +
+                "while the game locks the groups. Answers with the group's state after the press and the screen " +
+                "messages posted meanwhile.",
                 Schema.Object(
                     Schema.P("group", "number", "the custom group, 1 to 10, as its key", true)),
                 ActionGroup);

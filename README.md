@@ -69,7 +69,7 @@ paints the ground of Kerbin with the wrong texture until the space centre has be
 | `set_target` | sets the active vessel's target to another vessel, or clears it; refuses while targeting is locked, as it is in EVA construction mode, but not because the window of KSP is out of focus |
 | `go_eva` | sends a crew member of the active vessel out on EVA, as the EVA button of the crew portrait does, and answers once the kerbal is the active vessel |
 | `let_go_ladder` | makes the kerbal on EVA being flown let go of its ladder, as the jump key does on a ladder, and answers once it is still; a kerbal on a ladder keeps the game from switching vessels |
-| `screenshot` | captures the screen, interface included but not the message of this mod; returns the image and saves it as a PNG |
+| `screenshot` | captures the screen, interface included but not the message of this mod; saves it as a PNG when given a path, returns the image when given none (or when asked) |
 | `set_camera` | the flight camera's distance, heading and pitch, its field of view, and where it aims, as the middle mouse button does |
 | `set_ui` | hides or shows the game's interface in flight, as F2 does |
 | `map_view` | enters or leaves the map view of a flight, as the M key does, and answers once the game shows it; refuses when the game would ignore the key; centres the map's camera on a body or a vessel, as double-clicking it does, and sets the camera's distance |
@@ -135,7 +135,7 @@ A walk stops when the kerbal gets no further for five seconds, and fails when it
 ladder, or when the active vessel changes. `get_state` tells, for a kerbal on EVA, where it faces, what it
 is doing (walking, running, on a ladder...) and the movement held for it.
 | `get_member`, `set_member` | reads or writes a field or property of a loaded object of any mod — a window's position, say; `get_member` also follows a path of fields, list indexes and components, and reads several paths in the same frame |
-| `sample_members` | reads a list of members, of one object or several, at every rendered frame or every physics step, for a number of samples or seconds, and answers with a table, one row per sample; capped in rows and size |
+| `sample_members` | reads a list of members, of one object or several, at every rendered frame or every physics step, for a number of samples or seconds, and answers with a table, one row per sample; capped in rows, and in size unless a path is given, where the whole table is written while the answer gives a summary |
 | `call_method` | calls a method of a loaded object of any mod, or a static one, with or without arguments |
 
 These four take the first loaded object of the type, or with `match` (`path=value`) the first one whose path reads that value.
@@ -234,6 +234,11 @@ claude mcp add ksp -- python <path>/bridge/stdio-bridge.py --ksp dev=<path of a 
 
 Without `--ksp`, the folder of the environment variable `KSPDIR`, when it is set, is the one folder
 `ksp_start` may start, under the name `KSPDIR`.
+
+The bridge also keeps an account of what each tool call gave back to the assistant, beside its cache of the tools
+(`tool-calls-<port>.csv`, in `%LOCALAPPDATA%\KSP-Util-MCPServer` on Windows): one line per call, with the tool, the
+characters of text and of image it answered with, its duration and whether it failed. What a tool answers lands in
+the assistant's context: this tells which tools fill it.
 
 The bridge is a convenience for exploring the game with an assistant: a script that plays a protocol should
 post to the server itself, as below, and not need it.

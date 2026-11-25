@@ -22,28 +22,21 @@ namespace com.github.lhervier.ksp.util.mcpserver
         public static IEnumerable<Tool> All()
         {
             yield return new Tool("open_facility",
-                "Clicks a building of the space centre, as the left mouse button does: the Vehicle Assembly " +
-                "Building and the Space Plane Hangar open their editor, the Tracking Station its scene, the other " +
-                "buildings their screen over the space centre, or the dialog KSP shows when it is closed in this " +
-                "game. Waits until the scene it opens is up, or a second for a screen. Answers with the scene " +
-                "the game is in.",
+                "Clicks a space centre building, as the left mouse button does (an editor, the tracking station, " +
+                "a building's screen, or the closed dialog), and waits until it is up. Answers with the scene.",
                 Schema.Object(
                     Schema.P("facility", "string",
-                        "the building's facility name, as KSP names it: VAB, SPH, TrackingStation, " +
-                        "AstronautComplex, RnD, MissionControl, Administration, LaunchPad, Runway, FlagPole", true)),
+                        "KSP's facility name: VAB, SPH, TrackingStation, AstronautComplex, RnD, MissionControl, " +
+                        "Administration, LaunchPad, Runway, FlagPole", true)),
                 OpenFacility);
             yield return new Tool("facility_menu",
-                "Opens the menu of a building of the space centre, as a right click on it does, and reads it: the " +
-                "building's level and its number of levels, its damage in percent, the cost of its next upgrade " +
-                "and of its repairs, the funds, and the buttons that can be pressed. With a button, presses it as " +
-                "the left mouse button does and waits until KSP is done: Upgrade until the new level is built, " +
-                "Repair until the repairs are over; then answers with the building as it is. Without, leaves the " +
-                "menu open, for a screenshot; close_screen closes it. Fails when the button cannot be pressed, " +
-                "and when KSP asks for a confirmation (a vessel standing at the building).",
+                "Opens a space centre building's menu, as a right click does, and reads it (level, damage, " +
+                "upgrade and repair costs, funds, buttons). With a button, presses it and waits until KSP is " +
+                "done; without, leaves the menu open (close_screen closes it).",
                 Schema.Object(
                     Schema.P("facility", "string",
-                        "the building's facility name, as KSP names it: LaunchPad, Runway, VAB, SPH, " +
-                        "TrackingStation, AstronautComplex, RnD, MissionControl, Administration", true),
+                        "KSP's facility name: LaunchPad, Runway, VAB, SPH, TrackingStation, AstronautComplex, " +
+                        "RnD, MissionControl, Administration", true),
                     Schema.P("button", "string", "Upgrade or Repair; left out, the menu stays open")),
                 FacilityMenu);
             yield return new Tool("research_tech",
@@ -54,13 +47,9 @@ namespace com.github.lhervier.ksp.util.mcpserver
                     Schema.P("node", "string", "the node's id, as in the tech tree: basicRocketry, generalConstruction...", true)),
                 ResearchTech);
             yield return new Tool("close_screen",
-                "Closes one thing open over the scene, as its own button does, the topmost first: a dialog " +
-                "(its button pressed when it has a single one, such as the guide's of a new career; otherwise " +
-                "closed as Escape does), then the flight results shown after a crash, then, at the space centre, " +
-                "the menu of a building (as a click beside it " +
-                "does), the recovery report (there or in the tracking station), then the screen of a building. " +
-                "Answers with what it closed: closed " +
-                "is nothing when nothing was open.",
+                "Closes the topmost thing open over the scene, as its own button does: a dialog, the flight " +
+                "results, a building's menu, the recovery report, or a building's screen. Answers with what it " +
+                "closed (nothing when nothing was open).",
                 Schema.Object(
                     Schema.P("dialogs_only", "boolean",
                         "close a dialog only, never a menu, a report or a screen (default false)")),

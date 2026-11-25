@@ -20,17 +20,9 @@ namespace com.github.lhervier.ksp.util.mcpserver
         public static IEnumerable<Tool> All()
         {
             yield return new Tool("read_tracking_station",
-                "Reads the tracking station as the player sees it: each row of its list of tracked objects, from " +
-                "the top, with its vessel's name and type, whether the row is lit (shown as selected), where it " +
-                "lies on screen, and whether it lies within the visible part of the scrolled list (inView); the " +
-                "vessel the station has selected, which its Fly, Recover and Terminate buttons act on (none: " +
-                "null); and those buttons and the Track button, whether each shows and responds, and where. When " +
-                "another mod hides the station's own list and shows its own rows instead, listReplaced is true, " +
-                "rows are that mod's rows on screen (each a toggle of a toggle group, labelled with a tracked " +
-                "vessel's name), and " +
-                "stationRows are the station's own rows, hidden, with their vessel and whether each is lit. Points " +
-                "are pixels of the game's window from its top left corner, as mouse_click takes them. Only in the " +
-                "tracking station.",
+                "Reads the tracking station's list as shown: rows (vessel, type, lit, point, inView), the " +
+                "selected vessel, and the Fly, Recover, Terminate and Track buttons. When a mod replaces the " +
+                "list, listReplaced, its rows, and the hidden stationRows. Tracking station only.",
                 Schema.Object(), ReadTrackingStation) { Concurrent = true };
             yield return new Tool("read_dialogs",
                 "Reads the dialogs open over the scene, in any scene: each one's name, title and message, and its " +
@@ -39,10 +31,9 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 "open.",
                 Schema.Object(), ReadDialogs) { Concurrent = true };
             yield return new Tool("press_dialog_button",
-                "Presses a button of a dialog open over the scene, as a click does, then reads the dialogs as " +
-                "read_dialogs does: the button by its label, in the dialog whose title or name is given, or in any " +
-                "dialog. Refuses a button that does not show or does not respond, and a label shared by buttons of " +
-                "several dialogs when no dialog is named.",
+                "Presses a button of an open dialog by its label, in the dialog named or any, then reads the " +
+                "dialogs. Refuses a button not shown or not responding, and a label shared by several dialogs " +
+                "when none is named.",
                 Schema.Object(
                     Schema.P("button", "string", "the button's label, as read_dialogs gives it (case ignored)", true),
                     Schema.P("dialog", "string", "the dialog's title or name, as read_dialogs gives them (case ignored)")),

@@ -22,10 +22,9 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 Schema.Object(Schema.P("ut", "number", "seconds", true)),
                 SetTime);
             yield return new Tool("set_warp",
-                "Sets the time warp in flight, as the . and , keys do, or Alt with them for physics warp: the rate " +
-                "is an index into KSP's rates, 0 for normal time. Waits until KSP has reached it. Fails when KSP " +
-                "allows a lower rate only (altitude, atmosphere, an engine firing, a vessel moving over the " +
-                "ground): it then stays at that rate, which the answer gives.",
+                "Sets the time warp in flight, as the . and , keys (physics warp with Alt): rate is an index into " +
+                "KSP's rates, 0 normal. Waits until reached; fails when KSP only allows a lower rate, which the " +
+                "answer gives.",
                 Schema.Object(
                     Schema.P("rate_index", "number",
                         "0 for normal time; on rails, up to 7 (100000x with KSP's rates), in physics warp up to 3 (4x)", true),
@@ -39,10 +38,9 @@ namespace com.github.lhervier.ksp.util.mcpserver
                     Schema.P("seconds", "number", "instead of ut: how long to warp for, in seconds of game time")),
                 WarpTo);
             yield return new Tool("warp_to_morning",
-                "Warps to the next morning where the active vessel is, as the button of the time warp gauge does " +
-                "for a vessel on the ground: KSP's dawn, plus a minute. With local_time, to that time of the local " +
-                "solar day instead (0 midnight, 0.5 noon). Waits until KSP is back to normal time, and gives the " +
-                "local time before and after.",
+                "Warps to the next local morning of the active vessel (KSP's dawn plus a minute), or to " +
+                "local_time of the solar day (0.5 noon), and waits for normal time. Gives the local time before " +
+                "and after.",
                 Schema.Object(Schema.P("local_time", "number",
                     "the time of the local solar day to warp to, 0 to 1 (default: KSP's dawn, 0.3, plus a minute)")),
                 WarpToMorning);

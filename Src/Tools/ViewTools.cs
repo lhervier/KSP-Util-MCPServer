@@ -20,18 +20,17 @@ namespace com.github.lhervier.ksp.util.mcpserver
         public static IEnumerable<Tool> All()
         {
             yield return new Tool("screenshot",
-                "Captures the screen as it is drawn, user interface included. Returns the image, and saves it " +
-                "as a PNG when a path is given (relative to the KSP folder, or absolute).",
+                "Captures the screen as it is drawn, user interface included. Saves it as a PNG when a path is " +
+                "given (relative to the KSP folder, or absolute); returns the image when no path is given, or when " +
+                "return_image is true.",
                 Schema.Object(
                     Schema.P("path", "string", "where to save the PNG"),
-                    Schema.P("return_image", "boolean", "whether to return the image (default true)")),
+                    Schema.P("return_image", "boolean",
+                        "whether to return the image (default: true without path, false with one)")),
                 Screenshot) { Concurrent = true };
             yield return new Tool("set_camera",
-                "Sets the flight camera: distance from the vessel in metres, heading (the direction it looks in, " +
-                "from north towards east) and pitch in degrees, and its field of view, which Alt and the mouse " +
-                "wheel narrow (20 to 160 degrees, 60 by default), and where it aims away from the vessel, as " +
-                "dragging with the middle mouse button does (at most half the field of view either way). Values " +
-                "left out are kept.",
+                "Sets the flight camera: distance in metres, heading and pitch in degrees, field of view (20 to " +
+                "160), and its aim offset from the vessel as a middle-button drag does. Values left out are kept.",
                 Schema.Object(
                     Schema.P("distance", "number", "metres"),
                     Schema.P("heading", "number", "degrees"),
@@ -46,11 +45,9 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 Schema.Object(Schema.P("visible", "boolean", "true to show it, false to hide it", true)),
                 SetUi) { Concurrent = true };
             yield return new Tool("map_view",
-                "Enters or leaves the map view of a flight, as the M key does, and answers once the game shows " +
-                "the view asked for; centres the map's camera on a body or a vessel, as double-clicking it or " +
-                "Focus View of its menu does, and sets the camera's distance. Refuses when the game would not take " +
-                "the key: the map toggle locked, or the map view not allowed in this game. Answers with what the " +
-                "camera is centred on and its distance.",
+                "Enters or leaves the map view, as the M key does, centres the map camera on a body or vessel " +
+                "(focus) and sets its distance. Refused when the game would not take the key. Answers with the " +
+                "focus and distance.",
                 Schema.Object(
                     Schema.P("enabled", "boolean",
                         "true to enter the map view, false to leave it (default: true with focus or distance, the " +
@@ -58,16 +55,12 @@ namespace com.github.lhervier.ksp.util.mcpserver
                     Schema.P("focus", "string",
                         "the body's name, or else the vessel's id, or its name when no other vessel bears it"),
                     Schema.P("distance", "number",
-                        "the camera's distance from what it is centred on, in units of the map (6 km each), within " +
-                        "the limits the game sets for it")),
+                        "distance from the focus, in map units (6 km each)")),
                 MapViewTool);
             yield return new Tool("read_map_icon",
-                "In the map view, reads where the icon of a vessel is drawn, and where the vessel's latitude, " +
-                "longitude and altitude (those its caption shows) lie on its body as the map draws it, at the end of " +
-                "each of a number of rendered frames in a row, once the game has drawn them. Answers, over those " +
-                "frames, how many showed the icon and the mean and largest gap between the two points, in pixels; " +
-                "and, when asked, each frame: both points as mouse_move takes them, the gap, whether the icon " +
-                "showed, the time warp rate.",
+                "In the map view, over a number of rendered frames, compares where a vessel's icon is drawn with " +
+                "where its position lies on its body as drawn: frames showing the icon, mean and largest gap in " +
+                "pixels, and optionally each frame.",
                 Schema.Object(
                     Schema.P("vessel", "string", "the vessel's id, or its name when no other vessel bears it", true),
                     Schema.P("frames", "number", "how many rendered frames in a row to read, 1 to 1000 (default 1)"),
@@ -433,7 +426,8 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 File.WriteAllBytes(path, png);
                 call.Text("Saved " + Path.GetFullPath(path) + " (" + png.Length + " bytes)");
             }
-            if (call.Bool("return_image", true))
+            // a saved capture is meant to be read later, reduced: returned only when asked
+            if (call.Bool("return_image", string.IsNullOrEmpty(path)))
             {
                 call.Png(png);
             }

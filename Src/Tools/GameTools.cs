@@ -27,11 +27,9 @@ namespace com.github.lhervier.ksp.util.mcpserver
         public static IEnumerable<Tool> All()
         {
             yield return new Tool("load_save",
-                "Loads a save into flight, as the quickload does, from the space centre or from flight only (the " +
-                "scenarios of the mods installed since are added), and waits until the active vessel is unpacked and " +
-                "physics runs on it, or, with wait set to loaded, only until it is loaded, on rails or not: for a " +
-                "vessel that something keeps on rails. Refused anywhere else, the main menu included: open the game " +
-                "first with open_game, which goes to the space centre, as a player does.",
+                "Loads a save into flight, as the quickload does, from the space centre or flight only (open_game " +
+                "first from the main menu), and waits until physics runs on the active vessel, or with wait " +
+                "loaded until it is loaded, on rails or not.",
                 Schema.Object(
                     Schema.P("folder", "string", "the game's folder under saves/ (default: the game being played)"),
                     Schema.P("save", "string", "the save's name, without .sfs", true),
@@ -39,42 +37,33 @@ namespace com.github.lhervier.ksp.util.mcpserver
                         "loaded: until it is loaded, on rails or not")),
                 LoadSave);
             yield return new Tool("open_game",
-                "Opens a game's persistent save, from any scene, the main menu included, as Resume Game does, and " +
-                "always at the space centre, whatever scene the save names. Like the game, it writes the save back as " +
-                "persistent, with the scenarios of the mods installed since. Waits until the space centre is up and " +
-                "its buildings are set up.",
+                "Opens a game's persistent save from any scene, as Resume Game does, always at the space centre, " +
+                "writes it back as persistent, and waits until the space centre and its buildings are set up.",
                 Schema.Object(
                     Schema.P("folder", "string", "the game's folder under saves/", true)),
                 OpenGame);
             yield return new Tool("new_game",
-                "Starts a new game from the main menu, as New Game does with the Normal difficulty and the " +
-                "default flag: in saves/<folder>, opening at the space centre. Waits until the space centre is " +
-                "up. Refuses a folder that already holds a game. Some settings of the Custom difficulty can be " +
-                "changed, as its sliders and switches do, within their range.",
+                "Starts a new game from the main menu, as New Game does (Normal difficulty) in saves/<folder>, " +
+                "and waits for the space centre. Refuses a folder that holds a game. Some Custom difficulty " +
+                "settings can be given.",
                 Schema.Object(
                     Schema.P("folder", "string", "the new game's folder under saves/, also its name", true),
                     Schema.P("mode", "string", "CAREER, SCIENCE_SANDBOX or SANDBOX (default CAREER)"),
                     Schema.P("starting_funds", "number",
                         "a career's starting funds, 0 to 500000 in steps of 1000 (default 25000, Normal's)"),
                     Schema.P("funds_penalties", "number",
-                        "a career's funds penalties in percent, which the costs of building upgrades and repairs " +
-                        "are multiplied by: 10 to 1000 in steps of 10 (default 100, Normal's)"),
+                        "funds penalties in percent, 10 to 1000 (default 100)"),
                     Schema.P("starting_science", "number",
                         "the starting science of a career or a science game, 0 to 5000 in steps of 10 (default 0)"),
                     Schema.P("bypass_entry_purchase", "boolean",
-                        "whether the parts of a technology are bought as soon as it is researched, as the switch " +
-                        "Bypass Entry Purchase After Research does (default false, Normal's)"),
+                        "buy a technology's parts when researched (default false)"),
                     Schema.P("building_damage", "number",
-                        "the building impact damage multiplier, which the damage a crash does to a building of " +
-                        "the space centre is multiplied by: 0.01 to 1 (default 0.05, Normal's)")),
+                        "building impact damage multiplier, 0.01 to 1 (default 0.05)")),
                 NewGame);
             yield return new Tool("play_mission",
-                "Starts a mission of Making History from the main menu, from its start, as Restart then Play of " +
-                "Play Missions do: the game the mission saved is deleted, the mission's own game is set up, its launch sites placed, and the game opens in the scene the " +
-                "mission starts in. Waits until that scene is up. Needs the expansion, and the main menu. The only " +
-                "tool that can go from the main menu straight into flight, as the expansion does, without the space " +
-                "centre: a mod may then behave otherwise than in a flight reached through it, as Parallax does with " +
-                "the texture of the ground.",
+                "Starts a Making History mission from the main menu, from its start, as Restart then Play do, and " +
+                "waits until its first scene is up. The only path from the main menu straight into flight, which " +
+                "some mods (Parallax) handle differently.",
                 Schema.Object(
                     Schema.P("mission", "string",
                         "the mission's folder: absolute, or its name under the user's Missions folder or the " +

@@ -16,10 +16,9 @@ namespace com.github.lhervier.ksp.util.mcpserver
         public static IEnumerable<Tool> All()
         {
             yield return new Tool("switch_vessel",
-                "Makes a vessel the active one, and waits until physics runs on it: a loaded vessel as the switch " +
-                "vessel keys [ and ] do; one that is not loaded, of the player's, as Switch To of the map view " +
-                "does: KSP saves the game as persistent and opens the flight again on it. Fails when KSP refuses " +
-                "the switch (the active vessel under acceleration, moving over the surface, in the atmosphere...).",
+                "Makes a vessel active and waits until physics runs on it: a loaded one as [ and ] do, an " +
+                "unloaded one of the player's as Switch To of the map (persistent saved, flight reopened). Fails " +
+                "when KSP refuses (under acceleration, moving, in atmosphere).",
                 Schema.Object(
                     Schema.P("vessel", "string", "the vessel's id, or its name when no other vessel bears it", true)),
                 SwitchVessel);
@@ -49,15 +48,10 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 Schema.Object(Cheats.ConvertAll(c => Schema.P(c.Name, "boolean", c.Label)).ToArray()),
                 SetCheats) { Concurrent = true };
             yield return new Tool("set_position",
-                "Moves the active vessel above a point of a body, as Set Position of the Alt+F12 menu does, in the " +
-                "attitude it had against its local horizon before the move. It first leaves the map view, where the " +
-                "game builds no terrain, and stops the time warp. It holds the vessel a few metres up, " +
-                "still, until the ground and what stands on it are built under it, lowers it to the given height " +
-                "above whatever lies under it (the ground, a rock, a building), lets it go, and answers once it is " +
-                "landed (or splashed) and still, or after the time limit. The other loaded vessels, which the game " +
-                "puts on rails for the move, are put back where they stood if they come off rails elsewhere (a " +
-                "kerbal on EVA does). Refuses a point where it would reach another vessel (50 m from one that is " +
-                "not loaded).",
+                "Moves the active vessel above a point of a body, as Set Position of Alt+F12, keeping its " +
+                "attitude: leaves the map view, stops the warp, holds it until the ground is built, lowers it to " +
+                "the height asked, lets go, and waits until landed and still. Refuses a point near another " +
+                "vessel.",
                 Schema.Object(
                     Schema.P("body", "string", "the body's name (default: the vessel's)"),
                     Schema.P("latitude", "number", "degrees", true),
@@ -66,8 +60,7 @@ namespace com.github.lhervier.ksp.util.mcpserver
                         "metres between the lowest point of the vessel and what lies under it when it is let go " +
                         "(default 0.05)"),
                     Schema.P("heading", "number",
-                        "degrees from north, towards east, the direction the control point faces once moved: the vessel " +
-                        "is turned around the vertical (default: the heading it had)"),
+                        "degrees from north towards east for the control point (default: the current heading)"),
                     Schema.P("timeout", "number", "seconds to wait for the vessel to settle once let go (default 60)")),
                 SetPosition);
             yield return new Tool("set_orbit",

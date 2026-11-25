@@ -86,36 +86,24 @@ namespace com.github.lhervier.ksp.util.mcpserver
         public static IEnumerable<Tool> All()
         {
             yield return new Tool("mouse_move",
-                "Moves the mouse pointer to x, y of the game's window, as a mouse moved over the window does, in any " +
-                "scene, whether the window has the focus or not, the Windows session locked or not: the cursor of " +
-                "Windows moves there too, since the game reads its position. x and y are pixels of the " +
-                "game's window, counted from its top left corner (the frame and title bar left out): x to the right, " +
-                "y down. Unity's Input.mousePosition counts y up from the bottom edge instead. Refuses a point out of " +
-                "the window. Answers with the pointer's position as Unity reads it and the interface objects under it.",
+                "Moves the pointer to x, y in pixels of the game's window from its top left corner (y down), " +
+                "focus or not, session locked or not (the Windows cursor moves too). Answers with the position " +
+                "Unity reads and the interface objects under the pointer.",
                 Schema.Object(
                     Schema.P("x", "number", "pixels from the left edge of the game's window", true),
                     Schema.P("y", "number", "pixels from the top edge of the game's window", true)),
                 MouseMove);
             yield return new Tool("mouse_click",
-                "Clicks at x, y as a mouse does: moves the pointer there as mouse_move does, then presses and releases " +
-                "the button, and answers once the game has seen both, with the pointer's position as Unity reads it " +
-                "and the interface objects under it. x and y as mouse_move takes them. The pointer stays there. With " +
-                "count 2, a double click: a second click right after the first, as a player's double click. With " +
-                "modifiers, the click is made with those keys held, as a keyboard holds them: pressed once the " +
-                "pointer is there, each seen held by Input.GetKey before the button goes down, released once it " +
-                "went up. They satisfy Input.GetKey of their KeyCode (LeftShift, RightShift, LeftControl, " +
-                "RightControl, LeftAlt, RightAlt), and so the key bindings of the game bound to them: " +
-                "GameSettings.MODIFIER_KEY (Left Alt or Right Alt by default) among them, which the inventories of " +
-                "the part action windows read to take a whole stack; mod names the key MODIFIER_KEY is bound to. " +
-                "Refused with modifiers while the game's window does not have the focus: the game then reads no key.",
+                "Clicks at x, y (as mouse_move takes them) as a mouse does and answers once the game saw it, with " +
+                "the objects under the pointer. count 2 double-clicks. modifiers holds keys during the click (mod " +
+                "= the game's modifier key, Alt by default); refused with modifiers without the window's focus.",
                 Schema.Object(
                     Schema.P("x", "number", "pixels from the left edge of the game's window", true),
                     Schema.P("y", "number", "pixels from the top edge of the game's window", true),
                     Schema.P("button", "string", "left or right (default left)"),
                     Schema.P("count", "number", "1 for a click, 2 for a double click (default 1)"),
                     Schema.P("modifiers", "array",
-                        "keys held during the click: shift, ctrl, alt (the left ones), right_shift, right_ctrl, " +
-                        "right_alt, or mod, the game's modifier key (default none)")),
+                        "keys held: shift, ctrl, alt, right_shift, right_ctrl, right_alt, or mod")),
                 MouseClick);
         }
 

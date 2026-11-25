@@ -23,21 +23,16 @@ namespace com.github.lhervier.ksp.util.mcpserver
         public static IEnumerable<Tool> All()
         {
             yield return new Tool("list_parts",
-                "Lists the parts of the active vessel, or of another loaded vessel: id (its persistent id, which the " +
-                "other part tools take), name, title, the resources it holds with their amount and capacity, and " +
-                "whether its part action window is open and pinned, and for a wheel, whether it touches the ground. On " +
-                "EVA, the active vessel is the kerbal: name the " +
-                "vessel to list the parts of the one being built.",
+                "Lists the parts of the active or another loaded vessel: id (persistent id, taken by the other " +
+                "part tools), name, title, resources, whether its window is open and pinned, and for a wheel " +
+                "whether it is grounded. On EVA the active vessel is the kerbal.",
                 Schema.Object(
                     Schema.P("vessel", "string", "the vessel's id or name, as list_vessels gives them (default: the active vessel)")),
                 ListParts) { Concurrent = true };
             yield return new Tool("part_menu",
-                "Works the part action windows of the loaded vessels' parts as the mouse does, then reads them as " +
-                "read_part_menus does. open: a right click on the part, without the modifier key, so the other " +
-                "windows close unless pinned. pin, unpin: the pin of the part's open window. move: drags the part's " +
-                "open window by its title bar until its top left corner is at x, y (pixels from the top left corner " +
-                "of the game's window), kept on screen as a drag keeps it. close: a right click on empty space, " +
-                "without the modifier key: every window not pinned closes.",
+                "Works part action windows as the mouse does, then reads them as read_part_menus: open (right " +
+                "click on the part; unpinned windows close), pin, unpin, move (drag its title bar to x, y), close " +
+                "(right click on empty space).",
                 Schema.Object(
                     Schema.P("action", "string", "open, pin, unpin, move or close", true),
                     Schema.P("part", "number", "the part's id, as list_parts gives it (not for close)"),
@@ -45,20 +40,14 @@ namespace com.github.lhervier.ksp.util.mcpserver
                     Schema.P("y", "number", "move: pixels from the top edge of the game's window")),
                 PartMenu);
             yield return new Tool("read_part_menus",
-                "Reads the open part action windows: for each, the part's id and title, whether it is pinned, where " +
-                "it is on screen (x, y of its top left corner and its size, in pixels from the top left corner of the " +
-                "game's window), and the items it shows: buttons (their label and the name of their event), fields " +
-                "(their label, and for a read-only one the line it shows, value included), resources " +
-                "(amount and capacity), and " +
-                "the resource transfer controls: which of their In, Out and Stop buttons show, their state (None, " +
-                "In, Out) and how many controls of other parts they are linked with.",
+                "Reads the open part action windows: part id and title, pinned, rect on screen, and their items: " +
+                "buttons (label, event), fields (label, name, value, slider range or switch and cycle states), " +
+                "resources, and transfer controls (buttons shown, state, linked count).",
                 Schema.Object(), ReadPartMenus) { Concurrent = true };
             yield return new Tool("press_part_button",
-                "Presses a button of a part's open part action window, as a click does, then reads the windows as " +
-                "read_part_menus does: a button by its label or by the name of its event (the same in every language " +
-                "of the game), or the In, Out or Stop button of a resource's transfer " +
-                "control. Refuses a button the window does not show, and any input lock that makes the game ignore " +
-                "the click but the one KSP sets when its window loses the focus.",
+                "Presses a button of a part's open window, by label or event name, or a resource transfer's In, " +
+                "Out or Stop, then reads the windows as read_part_menus. Refuses a button not shown and any input " +
+                "lock but the focus one.",
                 Schema.Object(
                     Schema.P("part", "number", "the part's id, as list_parts gives it", true),
                     Schema.P("button", "string",
@@ -67,13 +56,9 @@ namespace com.github.lhervier.ksp.util.mcpserver
                     Schema.P("transfer", "string", "in, out or stop: the transfer control's button to press")),
                 PressPartButton);
             yield return new Tool("set_part_menu_value",
-                "Sets a slider of a part's open part action window to a number, as typing it in the slider's numeric " +
-                "box does: the game moves the slider there and handles the change as when the player drags it, " +
-                "rounded to the slider's step and kept within its range, on the part's symmetry counterparts too " +
-                "when the game does so. The slider by its label or by the name of its field (the same in every " +
-                "language of the game), as read_part_menus gives them. Then reads the windows as read_part_menus " +
-                "does. Refuses a slider the window does not show, and any input lock that makes the game ignore the " +
-                "slider but the one KSP sets when its window loses the focus.",
+                "Sets a slider of a part's open window, by label or field name, as typing in its numeric box does " +
+                "(rounded to its step, symmetry included), then reads the windows as read_part_menus. Refuses a " +
+                "slider not shown and any input lock but the focus one.",
                 Schema.Object(
                     Schema.P("part", "number", "the part's id, as list_parts gives it", true),
                     Schema.P("field", "string",
@@ -82,14 +67,9 @@ namespace com.github.lhervier.ksp.util.mcpserver
                     Schema.P("value", "number", "the number to set", true)),
                 SetPartMenuValue);
             yield return new Tool("click_part_menu_field",
-                "Clicks a switch or a cycle of a part's open part action window, as a click does: a switch (an on/off " +
-                "field) turns over, a cycle (a field that steps through named states, as the play direction of a " +
-                "robotic controller) moves to its next state, the game handling the change as for the player's click. " +
-                "The field by its label or by its name (the same in every language of the game), as read_part_menus " +
-                "gives them, with its value and, for a cycle, its states. Then reads the windows as read_part_menus " +
-                "does. Refuses a field the window does not show or the game does not let the player click, any input " +
-                "lock that makes the game ignore the click but the one KSP sets when its window loses the focus, and a " +
-                "click the game left without effect.",
+                "Clicks a switch or a cycle of a part's open part action window, by its label or field name, as a " +
+                "click does, then reads the windows as read_part_menus. Refuses a field not shown or not " +
+                "clickable, an input lock (but the focus one), and a click without effect.",
                 Schema.Object(
                     Schema.P("part", "number", "the part's id, as list_parts gives it", true),
                     Schema.P("field", "string",
@@ -97,11 +77,9 @@ namespace com.github.lhervier.ksp.util.mcpserver
                         "(case ignored)", true)),
                 ClickPartMenuField);
             yield return new Tool("list_docking_ports",
-                "Lists the docking ports of the active vessel, or of another loaded vessel: the part's id, as the " +
-                "other part tools take it, its title, the state of the port as the game names it, the id of the port " +
-                "it is docked to, and whether its part action window offers to undock: of two ports docked " +
-                "together, the game offers it on one only, which press_part_button then undocks with its Undock " +
-                "button.",
+                "Lists the docking ports of the active or another loaded vessel: part id, title, state, the port " +
+                "it is docked to, and whether its window offers Undock (one port of a pair does; " +
+                "press_part_button undocks).",
                 Schema.Object(
                     Schema.P("vessel", "string", "the vessel's id or name, as list_vessels gives them (default: the active vessel)")),
                 ListDockingPorts) { Concurrent = true };

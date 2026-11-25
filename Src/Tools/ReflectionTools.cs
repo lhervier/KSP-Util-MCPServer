@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using UnityEngine;
@@ -17,47 +18,39 @@ namespace com.github.lhervier.ksp.util.mcpserver
         private const BindingFlags AnyMember = BindingFlags.Public | BindingFlags.NonPublic
             | BindingFlags.Instance | BindingFlags.Static;
 
-        private const string MatchDescription =
-            "path=value: take the first loaded object whose path (as in get_member) reads this value, instead of " +
-            "the first loaded object";
+        private const string MatchDescription = "path=value: the first loaded object whose path reads this value";
 
         public static IEnumerable<Tool> All()
         {
             yield return new Tool("get_member",
-                "Reads a field or property of the first loaded object of a type (its full or short name; the full " +
-                "name for a type of Unity), or a static one, or follows a path from it: names of fields and " +
-                "properties, indexes in a list, and [Type] for the components of that type on a Unity object and " +
-                "its children, separated by dots (objects.0.[UnityEngine.Renderer].0.bounds). Numbers, strings, " +
-                "booleans, vectors, rotations, bounds and rects come back as JSON; lists as their items. With " +
-                "members, reads several paths from the same object in the same frame.",
+                "Reads a field or property of the first loaded object of a type, or a static one, or a dotted " +
+                "path from it (fields, list indexes, [Type] for components: " +
+                "objects.0.[UnityEngine.Renderer].0.bounds). With members, several paths read in the same frame.",
                 Schema.Object(
                     Schema.P("type", "string", "type name, full or short", true),
                     Schema.P("member", "string", "field or property name, or a path"),
                     Schema.P("members", "array",
-                        "several paths instead of member, read in the same frame: the answer gives each one's value " +
-                        "under its path, and why it could not be read under errors"),
+                        "several paths instead of member, read in the same frame (values, and errors per path)"),
                     Schema.P("match", "string", MatchDescription)),
                 GetMember) { Concurrent = true };
             yield return new Tool("sample_members",
-                "Reads a list of members at every rendered frame, after it is drawn, or at every physics step, " +
-                "for a number of samples or seconds, and answers with a table: one row per sample, with the frame, " +
-                "the real time since the first sample, the universal time, and each member's value (vectors and " +
-                "rotations as arrays). All the members of a row are read in the same frame; one sample reads " +
-                "members of different objects at once. Each object is found once, at the start, as get_member " +
-                "finds it. Stops at " + SampleMaxRows + " rows, or once the table reaches " + SampleMaxChars / 1000 +
-                " thousand characters, and says so.",
+                "Samples members (of one or several objects) at every rendered frame or physics step, for a " +
+                "number of samples or seconds: a table, one row per sample (frame, time, ut, then each member). " +
+                "With path, the whole table goes to that file and the answer is a summary; without, the answer is " +
+                "capped.",
                 Schema.Object(
                     Schema.P("reads", "array",
-                        "the members to read, each an object {type, member, match, label}: type, member and match as " +
-                        "get_member takes them, label the column's name (default type.member)", true),
+                        "the members, each {type, member, match, label} as get_member takes them; label names the " +
+                        "column", true),
                     Schema.P("frames", "number", "how many samples (default 100, at most " + SampleMaxRows + ")"),
                     Schema.P("seconds", "number",
-                        "seconds of real time to sample for at most (default 60, at most 600): sampling stops at " +
-                        "whichever of frames and seconds comes first"),
+                        "real seconds at most (default 60, at most 600); stops at frames or seconds, whichever " +
+                        "first"),
                     Schema.P("every", "string",
-                        "frame: at the end of every rendered frame (default); physics: after every physics step, " +
-                        "none while the game is paused"),
-                    Schema.P("interval", "number", "keeps one frame or step out of this many (default 1)")),
+                        "frame (default) or physics (none while paused)"),
+                    Schema.P("interval", "number", "keeps one frame or step out of this many (default 1)"),
+                    Schema.P("path", "string",
+                        "a JSON file to write the whole table to (relative to the KSP folder, or absolute)")),
                 SampleMembers) { Concurrent = true };
             yield return new Tool("set_member",
                 "Writes a field or property of the first loaded object of a type, or a static one. The value is a " +
@@ -69,10 +62,9 @@ namespace com.github.lhervier.ksp.util.mcpserver
                     Schema.P("match", "string", MatchDescription)),
                 SetMember) { Concurrent = true };
             yield return new Tool("call_method",
-                "Calls a method of the first loaded object of a type, or a static one, and returns what it " +
-                "returns. Without arguments, the method that takes none; with arguments, the first method of that " +
-                "name that takes as many, each argument converted to its parameter's type (numbers, strings, " +
-                "booleans, enums, and {x, y, z} for a Vector3 or a Vector3d).",
+                "Calls a method of the first loaded object of a type, or a static one, and returns its result. " +
+                "Arguments are converted to the parameter types (numbers, strings, booleans, enums, {x, y, z} for " +
+                "vectors); the first overload taking as many is used.",
                 Schema.Object(
                     Schema.P("type", "string", "type name, full or short", true),
                     Schema.P("method", "string", "method name", true),
@@ -382,9 +374,10 @@ namespace com.github.lhervier.ksp.util.mcpserver
             call.Text(answer);
         }
 
-        // sample_members: the most rows it answers with, and the most characters its table may take.
+        // sample_members: the most rows it reads, and the most characters its table may take in an answer (the
+        // answer lands in the client's context; a longer table goes to a file).
         private const int SampleMaxRows = 5000;
-        private const int SampleMaxChars = 200000;
+        private const int SampleMaxChars = 20000;
 
         /// <summary>One column of sample_members: a path, the object it is read on, and its label.</summary>
         private sealed class Column
@@ -443,6 +436,13 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 header.Add(label);
             }
 
+            string file = call.String("path");
+            bool toFile = !string.IsNullOrEmpty(file);
+            if (toFile && !Path.IsPathRooted(file))
+            {
+                file = Path.Combine(KSPUtil.ApplicationRootPath, file);
+            }
+
             List<object> rows = new List<object>();
             int characters = Json.Write(header).Length;
             bool truncated = false;
@@ -486,11 +486,14 @@ namespace com.github.lhervier.ksp.util.mcpserver
                     row.Add(Read(column.Type, column.Target, column.Path, -1, out object value, out string error)
                         ? value : "error: " + error);
                 }
-                characters += Json.Write(row).Length + 1;
-                if (characters > SampleMaxChars)
+                if (!toFile)
                 {
-                    truncated = true;
-                    break;
+                    characters += Json.Write(row).Length + 1;
+                    if (characters > SampleMaxChars)
+                    {
+                        truncated = true;
+                        break;
+                    }
                 }
                 rows.Add(row);
             }
@@ -504,7 +507,72 @@ namespace com.github.lhervier.ksp.util.mcpserver
             {
                 answer["truncated"] = true;
             }
-            call.Text(answer);
+            if (!toFile)
+            {
+                if (truncated)
+                {
+                    answer["hint"] = "give path to get the whole table in a file";
+                }
+                call.Text(answer);
+                yield break;
+            }
+            string directory = Path.GetDirectoryName(file);
+            if (!string.IsNullOrEmpty(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+            File.WriteAllText(file, Json.Write(answer));
+            call.Text(Summary(answer, header, rows, Path.GetFullPath(file)));
+        }
+
+        /// <summary>
+        /// The answer of sample_members when its table went to a file: where, how many rows, the first and last row,
+        /// and the range of each column whose values are all numbers.
+        /// </summary>
+        private static Dictionary<string, object> Summary(Dictionary<string, object> table, List<object> header,
+            List<object> rows, string file)
+        {
+            Dictionary<string, object> summary = new Dictionary<string, object>
+            {
+                { "path", file },
+                { "every", table["every"] },
+                { "columns", header },
+                { "rows", rows.Count }
+            };
+            if (table.ContainsKey("truncated"))
+            {
+                summary["truncated"] = true;
+            }
+            if (rows.Count == 0)
+            {
+                return summary;
+            }
+            summary["first"] = rows[0];
+            summary["last"] = rows[rows.Count - 1];
+            Dictionary<string, object> ranges = new Dictionary<string, object>();
+            for (int c = 0; c < header.Count; c++)
+            {
+                double min = double.PositiveInfinity, max = double.NegativeInfinity;
+                bool numeric = true;
+                foreach (object row in rows)
+                {
+                    object value = ((List<object>)row)[c];
+                    if (!(value is IConvertible) || value is string || value is bool)
+                    {
+                        numeric = false;
+                        break;
+                    }
+                    double x = Convert.ToDouble(value, CultureInfo.InvariantCulture);
+                    min = Math.Min(min, x);
+                    max = Math.Max(max, x);
+                }
+                if (numeric)
+                {
+                    ranges[(string)header[c]] = new List<object> { min, max };
+                }
+            }
+            summary["ranges"] = ranges;
+            return summary;
         }
 
         /// <summary>

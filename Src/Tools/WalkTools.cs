@@ -28,34 +28,27 @@ namespace com.github.lhervier.ksp.util.mcpserver
         public static IEnumerable<Tool> All()
         {
             yield return new Tool("set_eva_controls",
-                "Holds the movement keys of the active kerbal on EVA until changed: forward (positive) or back, and " +
-                "right (positive) or left, of where the kerbal faces when called. On the ground or in water, it " +
-                "turns towards that direction and keeps walking along it, as the keys do with the camera behind it " +
-                "(right alone: a quarter turn right, then straight on); only the signs count, the kerbal goes at " +
-                "its own pace. On a ladder, forward climbs and back goes down. Run: as the run key held. Both left " +
-                "out or 0 let go of the keys: the kerbal stops. Answers with the state, whose eva part tells the " +
-                "kerbal's facing and what it is doing.",
+                "Holds the active EVA kerbal's movement keys until changed: forward/back and right/left (signs " +
+                "only), relative to where it faces when called; on a ladder forward climbs. run holds the run " +
+                "key. Both 0 or omitted let go. Answers with the state.",
                 Schema.Object(
                     Schema.P("forward", "number", "positive forward, negative back"),
                     Schema.P("right", "number", "positive right, negative left"),
                     Schema.P("run", "boolean", "run instead of walking (default false)")),
                 SetEvaControls);
             yield return new Tool(WalkTool,
-                "Walks the active kerbal on EVA along a heading, turning to face it first, for a distance, then " +
-                "lets go and waits for it to stand still. The kerbal goes at its own pace: about 0.8 m/s walking " +
-                "and 2.2 m/s running on Kerbin, in bounds where gravity is low. Stops when it gets no further for " +
-                "five seconds (stoppedBecause stalled). Fails when the kerbal falls over, grabs a ladder, or when " +
-                "the active vessel changes; stop_drive stops it.",
+                "Walks the active EVA kerbal along a heading for a distance, then lets go and waits until it " +
+                "stands. Stops when stalled for five seconds; fails when it falls, grabs a ladder or the active " +
+                "vessel changes. stop_drive stops it.",
                 Schema.Object(
                     Schema.P("heading", "number", "degrees from north towards east", true),
                     Schema.P("distance", "number", "metres to walk, straight from the start (default 10)"),
                     Schema.P("run", "boolean", "run instead of walking (default false)")),
                 Walk);
             yield return new Tool(WalkToTool,
-                "Walks the active kerbal on EVA to a latitude and longitude, heading straight for it, and lets go " +
-                "within the tolerance, then waits for it to stand still. Runs when asked, until 3 m from the " +
-                "target, then walks. Stops when it gets no closer for five seconds (stoppedBecause stalled). Fails " +
-                "when the kerbal falls over, grabs a ladder, or when the active vessel changes; stop_drive stops it.",
+                "Walks the active EVA kerbal to a latitude and longitude (running if asked, until 3 m away), lets " +
+                "go within the tolerance and waits until it stands. Stops when stalled; fails when it falls, " +
+                "grabs a ladder or the active vessel changes.",
                 Schema.Object(
                     Schema.P("latitude", "number", "degrees", true),
                     Schema.P("longitude", "number", "degrees", true),

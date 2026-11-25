@@ -35,15 +35,9 @@ namespace com.github.lhervier.ksp.util.mcpserver
         public static IEnumerable<Tool> All()
         {
             yield return new Tool("set_focus_lock",
-                "Keeps off, or lets the game set again, the lock it puts on every control while its window does " +
-                "not have the focus (flightDriver_ApplicationFocus in flight, and the like in the editors, the " +
-                "space centre and the main menu): while it holds, the part action windows stop updating, " +
-                "resource transfers included, the staging turns purple, and the keys and clicks of the game are " +
-                "ignored. With ignore true, the lock is lifted at once and kept off in every scene, so that a " +
-                "script plays as in a window with the focus while the player works in another; with ignore " +
-                "false, the game's own behaviour comes back, the lock set again if the window is out of focus. " +
-                "Off when KSP starts, and when the server is turned off from the toolbar. Left out, ignore is " +
-                "kept. Answers with the switch, whether the window has the focus, and the focus locks held.",
+                "With ignore true, lifts and keeps off the lock the game sets on every control while its window " +
+                "lacks the focus, in every scene, so a script plays as with the focus; false gives back the " +
+                "game's behaviour. Off at start. Answers with the switch, the focus and the locks held.",
                 Schema.Object(Schema.P("ignore", "boolean", "true to keep the lock off, false for the game's behaviour")),
                 SetFocusLock) { Concurrent = true };
         }

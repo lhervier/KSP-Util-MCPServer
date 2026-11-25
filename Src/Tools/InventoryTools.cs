@@ -22,20 +22,9 @@ namespace com.github.lhervier.ksp.util.mcpserver
         public static IEnumerable<Tool> All()
         {
             yield return new Tool("read_inventories",
-                "Reads the inventories shown, in flight and in the editors: those of the open part action windows " +
-                "(where: partMenu), of the panel of EVA construction or cargo (constructionPanel) and of the " +
-                "editors' inventory panel (editorPanel), with whether that panel is open, and collapsed: true for " +
-                "one in a collapsed group of its window, whose slots take no click. For each: its part (id " +
-                "as list_parts gives it, name, title, vessel), the kerbal for a kerbal's inventory, its volume and " +
-                "mass (occupied: the parts stored; shown: what its footer shows, the held part included while it " +
-                "previews a store; limit, 0 for none; reached: the flag that refuses a store), and its slots: " +
-                "index, part name, variant, quantity, stack capacity, or empty, and the middle of each on screen " +
-                "(x, y, pixels of the game's window from its top left corner, as mouse_click takes them) with " +
-                "whether it lies within the visible part of its scrolled list. Also the part held by the mouse, " +
-                "shared by every inventory: its name, stackSize and heldPartIsStack, the inventory it was taken " +
-                "from, the slot clicked and the slot marked as emptied (each by where, part or kerbal and index, " +
-                "with its quantity now), and the held icon with the amount it shows. An empty list when no " +
-                "inventory is shown; held is null in a scene without the game's inventory controller.",
+                "Reads the inventories shown (part windows, EVA construction or cargo panel, editor panel): part, " +
+                "kerbal, volume and mass, slots with part, quantity and on-screen point for mouse_click, " +
+                "collapsed; and the part held by the mouse (held), with its stack and source slot.",
                 Schema.Object(), ReadInventories) { Concurrent = true };
         }
 

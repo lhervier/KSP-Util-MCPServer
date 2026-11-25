@@ -28,32 +28,22 @@ namespace com.github.lhervier.ksp.util.mcpserver
         public static IEnumerable<Tool> All()
         {
             yield return new Tool("launch_vessel",
-                "Launches a vessel from its .craft file at a launch site, from the space centre or one of its " +
-                "editors only, as the space centre's launch dialogs or an editor's Launch button do. Boards the crew " +
-                "the editor would give it by default or the kerbals named, and waits until physics runs on it. KSP " +
-                "saves the game as 'persistent' first, as it does for any launch. Refused in any other scene, flight " +
-                "and the main menu included: go to the space centre first (go_to_scene from flight, open_game from " +
-                "the main menu). Refuses a craft whose parts are not all " +
-                "unlocked in this game, where the launch dialog of the space centre asks for a confirmation, and a " +
-                "launch site the game does not offer.",
+                "Launches a .craft at a launch site, from the space centre or an editor only, as the launch " +
+                "dialogs do, with the default crew or the kerbals named, and waits until physics runs. Saves " +
+                "persistent first. Refuses parts not unlocked and sites the game does not offer.",
                 Schema.Object(
                     Schema.P("craft", "string",
-                        "the .craft file: absolute, or relative to the Ships folder of the game being played " +
-                        "(SPH/<name>.craft or VAB/<name>.craft)", true),
+                        "the .craft file: absolute, or relative to the game's Ships folder (VAB/<name>.craft)", true),
                     Schema.P("site", "string",
                         "the launch site's name, as list_launch_sites gives it (default Runway; LaunchPad for the pad)"),
                     Schema.P("crew", "string",
-                        "the kerbals to board, by name, separated by commas, seated in the order of the craft's " +
-                        "seats as the editor fills them; each must be available (default: the editor's crew)"),
+                        "kerbals to board, comma-separated, in seat order (default: the editor's crew)"),
                     Schema.P("empty_inventories", "boolean",
-                        "board the crew with empty inventories, as emptying each kerbal's inventory in the editor's " +
-                        "crew panel does: no parachute, no jetpack (default false)")),
+                        "board the crew with empty inventories (default false)")),
                 LaunchVessel);
             yield return new Tool("list_launch_sites",
-                "Lists the launch sites a vessel can be launched at, as the launch site selector of the editors " +
-                "offers them: the name launch_vessel takes, the name the game shows, the editor that launches there " +
-                "(VAB or SPH), the body, what places it (the space centre, a PQSCity or a PQSCity2), and the " +
-                "latitude, longitude and altitude of its first spawn point. Needs a game loaded.",
+                "Lists the launch sites the editors offer: the name launch_vessel takes, the shown name, the " +
+                "editor, the body, what places it, and its first spawn point. Needs a game loaded.",
                 Schema.Object(), ListLaunchSites) { Concurrent = true };
             yield return new Tool("revert_to_launch",
                 "Reverts the flight to its launch, as Revert to Launch does, and waits until physics runs on " +
@@ -71,10 +61,9 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 "and answers with the place and the share of the value it gives (location, factor).",
                 Schema.Object(), RecoverVessel);
             yield return new Tool("go_to_scene",
-                "Leaves the flight, or the scene the game is in, for the space centre, the tracking station or " +
-                "the main menu, saving the game as persistent first as the game's own buttons do, and waits until " +
-                "that scene is up. Refused at the main menu, which has no game to leave: open_game or new_game " +
-                "open one at the space centre.",
+                "Leaves the current scene for the space centre, the tracking station or the main menu, saving " +
+                "persistent first as the game's buttons do, and waits until it is up. Refused at the main menu: " +
+                "open_game or new_game first.",
                 Schema.Object(
                     Schema.P("scene", "string", "SPACECENTER, TRACKSTATION or MAINMENU", true)),
                 GoToScene);

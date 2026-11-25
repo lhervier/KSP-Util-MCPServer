@@ -19,21 +19,15 @@ namespace com.github.lhervier.ksp.util.mcpserver
         // round.
         private const double ReachedWithin = 3.0;
 
-        // What drive and drive_to tell of their steering.
-        private const string LearnsTurning = "How sharply the rover turns at each speed it learns as it drives, " +
-            "and remembers for that vessel until the game is closed.";
-
         // Times drive_to stops to choose its direction again before giving up.
         private const int MaxTurnRounds = 4;
 
         public static IEnumerable<Tool> All()
         {
             yield return new Tool("set_controls",
-                "Holds the wheel throttle and steering, and the pitch, yaw and roll, of the active vessel at the " +
-                "given values (−1 to 1) until changed, as the player's keys give them (D gives a yaw of 1); null " +
-                "or left out gives them back to the player. Steering: positive turns left. Also sets the brakes " +
-                "when given, and the landing gear as its button by the altimeter does: refused while the game locks " +
-                "the gear group, and without effect on a vessel that cannot be controlled.",
+                "Holds the active vessel's wheel throttle and steering (positive turns left), pitch, yaw and roll " +
+                "(−1 to 1, as the keys) until changed; null or omitted gives them back to the player. Also sets " +
+                "the brakes, and the gear as its button does.",
                 Schema.Object(
                     Schema.P("wheel_throttle", "number", "−1 (reverse) to 1 (forward)"),
                     Schema.P("wheel_steer", "number", "−1 to 1, positive to the left"),
@@ -44,15 +38,10 @@ namespace com.github.lhervier.ksp.util.mcpserver
                     Schema.P("gear", "boolean", "landing gear and legs down (true) or up (false)")),
                 SetControls);
             yield return new Tool(DriveTool,
-                "Drives the active rover along a heading at a given speed, steering to hold it, then stops with " +
-                "the brakes on and waits for it to be still. In reverse, the rover backs away, its front still " +
-                "facing the heading. Stops after a distance, or when the floating origin " +
-                "shifts if until_shift is true, whichever comes first. The rover's front is where its wheels " +
-                "drive it with a positive throttle. Far off the heading, it slows down to turn; it never turns " +
-                "harder than keeps it on its wheels. " + LearnsTurning + " Stalled against a small step, it asks " +
-                "for more speed every three seconds until the rover gets over; stuck with the most it asks, it " +
-                "stops (stoppedBecause stalled). Fails, the rover braked, when it tips over, runs away at " +
-                "twice the speed asked, or when the active vessel changes; stop_drive stops it.",
+                "Drives the active rover along a heading at a speed (in reverse with its front still facing the " +
+                "heading) for a distance, or until the floating origin shifts, then brakes and waits until still. " +
+                "Stops when stalled; fails when it tips over, runs away or the active vessel changes. stop_drive " +
+                "stops it.",
                 Schema.Object(
                     Schema.P("heading", "number", "degrees from north towards east", true),
                     Schema.P("speed", "number", "metres per second (default 3)"),
@@ -61,14 +50,10 @@ namespace com.github.lhervier.ksp.util.mcpserver
                     Schema.P("reverse", "boolean", "drive backwards, the front facing the heading (default false)")),
                 Drive);
             yield return new Tool(DriveToTool,
-                "Drives the active rover to a latitude and longitude and stops there with the brakes on, still. " +
-                "Drives forward or in reverse, whichever faces the target; when the target falls behind the " +
-                "rover further than 3 m away, stops and chooses again. Follows the straight line from where it " +
-                "chose to the target. Far off that line's direction, it slows down to turn; it never turns harder " +
-                "than keeps it on its wheels. " + LearnsTurning + " Stops after 300 s. Stalled against a small step, it asks for more speed every three seconds until the " +
-                "rover gets over; stuck with the most it asks, it stops (stalled). For a precise stop, start from a few metres away, roughly lined up with the target. " +
-                "Fails, the rover braked, when it tips over, runs away at twice the speed asked, or when the " +
-                "active vessel changes; stop_drive stops it.",
+                "Drives the active rover to a latitude and longitude, forward or in reverse, and stops there " +
+                "braked and still. Gives up after 300 s or when stalled; fails when it tips over, runs away or " +
+                "the active vessel changes. For a precise stop, start a few metres away, lined up. stop_drive " +
+                "stops it.",
                 Schema.Object(
                     Schema.P("latitude", "number", "degrees", true),
                     Schema.P("longitude", "number", "degrees", true),
@@ -76,11 +61,9 @@ namespace com.github.lhervier.ksp.util.mcpserver
                     Schema.P("tolerance", "number", "metres from the target to stop at (default 0.2)")),
                 DriveTo);
             yield return new Tool("stop_drive",
-                "Stops the rover: ends a drive or drive_to still running, whose call then fails, or else lets go " +
-                "of the wheels held by set_controls; puts the brakes on and waits for the rover to be still, " +
-                "unless the game is paused. Stops a kerbal on EVA the same way: ends a walk or walk_to, or lets go " +
-                "of the keys held by set_eva_controls, and waits for it to stand still. Can be called while " +
-                "another tool runs.",
+                "Stops a running drive, drive_to, walk or walk_to (whose call then fails), or lets go of the " +
+                "controls held by set_controls or set_eva_controls; brakes the rover and waits until still. Can " +
+                "be called while another tool runs.",
                 Schema.Object(), StopDrive) { Concurrent = true };
         }
 
