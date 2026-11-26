@@ -94,6 +94,10 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 path = Path.Combine(GameTools.SavePath(HighLogic.SaveFolder, "Ships"), path);
             }
             path = Path.GetFullPath(path);
+            if (!Sandbox.Allows(call, path))
+            {
+                yield break;
+            }
             ConfigNode craft = File.Exists(path) ? ConfigNode.Load(path) : null;
             if (craft == null)
             {

@@ -418,6 +418,10 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 {
                     path = Path.Combine(KSPUtil.ApplicationRootPath, path);
                 }
+                if (!Sandbox.Allows(call, path))
+                {
+                    yield break;
+                }
                 string directory = Path.GetDirectoryName(path);
                 if (!string.IsNullOrEmpty(directory))
                 {

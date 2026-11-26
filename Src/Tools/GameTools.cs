@@ -101,6 +101,10 @@ namespace com.github.lhervier.ksp.util.mcpserver
             }
             string folder = call.String("folder", HighLogic.SaveFolder);
             string save = call.String("save");
+            if (!Sandbox.Allows(call, SavePath(folder, save + ".sfs")))
+            {
+                yield break;
+            }
             bool onRailsToo;
             if (!call.Choice("wait", "physics", LoadWaits, out onRailsToo))
             {
@@ -130,6 +134,10 @@ namespace com.github.lhervier.ksp.util.mcpserver
         private static IEnumerator OpenGame(ToolCall call)
         {
             string folder = call.String("folder");
+            if (!Sandbox.Allows(call, SavePath(folder ?? "", "persistent.sfs")))
+            {
+                yield break;
+            }
             // Read as GamePersistence.LoadGame reads a save.
             ConfigNode node = GamePersistence.LoadSFSFile("persistent", folder);
             Game game = node != null ? GamePersistence.LoadGameCfg(node, "persistent", true, false) : null;
@@ -171,6 +179,10 @@ namespace com.github.lhervier.ksp.util.mcpserver
             string folder = call.String("folder");
             Game.Modes mode;
             if (!call.Choice("mode", "CAREER", Modes, out mode))
+            {
+                yield break;
+            }
+            if (!Sandbox.Allows(call, SavePath(folder ?? "", "persistent.sfs")))
             {
                 yield break;
             }
@@ -288,6 +300,10 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 call.Fail("No mission " + call.String("mission") + " (persistent.mission not found)");
                 yield break;
             }
+            if (!Sandbox.Allows(call, file))
+            {
+                yield break;
+            }
             Expansions.Missions.MissionFileInfo info = Expansions.Missions.MissionFileInfo.CreateFromPath(file);
 
             // What Restart does (MissionPlayDialog.ConfirmRestart): the files of the game the mission saved are
@@ -388,6 +404,10 @@ namespace com.github.lhervier.ksp.util.mcpserver
             }
             string save = call.String("save");
             string folder = call.String("folder", HighLogic.SaveFolder);
+            if (!Sandbox.Allows(call, SavePath(folder, save + ".sfs")))
+            {
+                yield break;
+            }
 
             // What a quicksave does: the game brought up to date, set to open in the scene it was saved from.
             Game game = HighLogic.CurrentGame.Updated();

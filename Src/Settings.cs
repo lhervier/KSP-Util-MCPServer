@@ -17,6 +17,9 @@ namespace com.github.lhervier.ksp.util.mcpserver
         /// <summary>Whether the server listens as soon as KSP starts, rather than once the player turns it on.</summary>
         public readonly bool ListenAtStart = true;
 
+        /// <summary>Whether the server acts on the game alone (<see cref="mcpserver.Sandbox"/>).</summary>
+        public readonly bool Sandbox;
+
         private Settings(ConfigNode node)
         {
             if (node == null)
@@ -37,6 +40,11 @@ namespace com.github.lhervier.ksp.util.mcpserver
             if (bool.TryParse(node.GetValue("listen_at_start"), out listenAtStart))
             {
                 ListenAtStart = listenAtStart;
+            }
+            bool sandbox;
+            if (bool.TryParse(node.GetValue("sandbox"), out sandbox))
+            {
+                Sandbox = sandbox;
             }
         }
 

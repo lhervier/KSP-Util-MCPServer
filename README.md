@@ -192,6 +192,14 @@ Its settings are in `GameData/KSPUtilMCPServer/PluginData/settings.cfg`, read wh
 | `port` | `8770` | the TCP port it listens on |
 | `screen_messages` | `true` | whether each tool shows its name at the top of the screen while it runs; `false` turns the messages off |
 | `listen_at_start` | `true` | whether it listens as soon as KSP starts; `false` keeps its port closed until it is turned on |
+| `sandbox` | `false` | whether it keeps to the game; `true` hides the types of the .NET framework, lets `set_member` and `call_method` write or pass only numbers, booleans, enums and vectors, and keeps every file a tool reads or writes inside the KSP folder |
+
+**The sandbox.** The tools run inside KSP, with the rights of whoever started it, and any program of the
+computer can reach `127.0.0.1`. Leaving the game takes a string: a path, a URL, a command. KSP itself starts any
+program once a string field of its main menu is set and the method that reads it is called. With
+`sandbox = true`, no tool takes such a string, and `set_member` and `call_method` still serve to look into a bug.
+It is a guard against mistakes and injected instructions, not a proof: a method without parameters still runs
+whatever it runs.
 
 It listens on `127.0.0.1` only: nothing outside the computer KSP runs on can reach it.
 

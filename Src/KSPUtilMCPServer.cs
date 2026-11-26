@@ -47,6 +47,11 @@ namespace com.github.lhervier.ksp.util.mcpserver
             tools.AddRange(ExtensionTools.All());
 
             _settings = Settings.Read();
+            Sandbox.Set(_settings.Sandbox);
+            if (Sandbox.On)
+            {
+                Log.Info("Sandboxed: no framework type, no string written or passed, files inside the KSP folder only");
+            }
             ToolMessage.SetEnabled(_settings.ScreenMessages);
             _protocol = new McpProtocol(tools);
             _button = new ServerButton(() => SetListening(true), () => SetListening(false));

@@ -100,7 +100,8 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 return game;
             }
             // Unity's own types (UnityEngine.Renderer) are in none of the assemblies above: by full name only.
-            return AppDomain.CurrentDomain.GetAssemblies().Select(a => a.GetType(name)).FirstOrDefault(t => t != null);
+            return AppDomain.CurrentDomain.GetAssemblies().Where(a => Sandbox.Allows(a)).Select(a => a.GetType(name))
+                .FirstOrDefault(t => t != null);
         }
 
         /// <summary>Splits a path at its dots, except the dots inside a [Type] step.</summary>
@@ -442,6 +443,10 @@ namespace com.github.lhervier.ksp.util.mcpserver
             {
                 file = Path.Combine(KSPUtil.ApplicationRootPath, file);
             }
+            if (toFile && !Sandbox.Allows(call, file))
+            {
+                yield break;
+            }
 
             List<object> rows = new List<object>();
             int characters = Json.Write(header).Length;
@@ -628,6 +633,10 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 yield break;
             }
             Type valueType = member is FieldInfo f ? f.FieldType : ((PropertyInfo)member).PropertyType;
+            if (!Sandbox.AllowsValue(call, valueType, type.FullName + "." + member.Name))
+            {
+                yield break;
+            }
             object value = FromJson(call.Arguments["value"], valueType);
             if (member is FieldInfo field)
             {
@@ -664,6 +673,13 @@ namespace com.github.lhervier.ksp.util.mcpserver
                 yield break;
             }
             ParameterInfo[] parameters = method.GetParameters();
+            foreach (ParameterInfo parameter in parameters)
+            {
+                if (!Sandbox.AllowsValue(call, parameter.ParameterType, type.FullName + "." + method.Name))
+                {
+                    yield break;
+                }
+            }
             object[] values = new object[arguments.Count];
             for (int i = 0; i < values.Length; i++)
             {
