@@ -260,7 +260,7 @@ curl -X POST http://127.0.0.1:8770/mcp/ -H "Content-Type: application/json" \
 
 `{"method":"tools/list"}` lists the tools with the schema of their arguments. A complete example, a
 Python script with no dependency that plays a whole protocol, is
-[`run-driving-runway.py`](https://github.com/lhervier/KSP-Fix-TerrainPrecision/blob/main/diag/statics/automation/run-driving-runway.py)
+[`run-driving-runway.py`](https://github.com/lhervier/KSP-Fix-TerrainPrecision/blob/main/docs/statics/diag/automation/run-driving-runway.py)
 in Terrain Precision Fix.
 
 ## Adding tools from another mod
